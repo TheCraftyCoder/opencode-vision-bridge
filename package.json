@@ -1,0 +1,22 @@
+{
+  "name": "opencode-vision-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm test"
+  },
+  "dependencies": {
+    "@opencode-ai/ai": "0.0.0-next-16977",
+    "@opencode-ai/client": "0.0.0-next-16977",
+    "@opencode-ai/plugin": "0.0.0-next-16977"
+  },
+  "devDependencies": {
+    "@types/node": "^24.3.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}
