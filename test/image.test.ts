@@ -1,10 +1,11 @@
 import assert from "node:assert/strict"
-import { mkdtemp, readFile } from "node:fs/promises"
+import { mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import test from "node:test"
 
 import {
+  imageFromFile,
   imageFromPart,
   saveImage,
   type ImageLikePart,
@@ -64,4 +65,29 @@ test("saveImage writes a deterministic digest-named file and returns its file UR
   assert.match(first.url, /^file:\/\//)
   assert.match(path.basename(first.path), /^[a-f0-9]{64}\.png$/)
   assert.deepEqual(await readFile(first.path), PNG_BYTES)
+})
+
+test("imageFromFile maps supported extensions and defaults unknown extensions to PNG", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "vision-bridge-file-image-"))
+  const expectedTypes = new Map([
+    ["image.png", "image/png"],
+    ["image.jpg", "image/jpeg"],
+    ["image.JPEG", "image/jpeg"],
+    ["image.gif", "image/gif"],
+    ["image.webp", "image/webp"],
+    ["image.bmp", "image/bmp"],
+    ["image.avif", "image/avif"],
+    ["image.unknown", "image/png"],
+  ])
+
+  await Promise.all(
+    [...expectedTypes].map(async ([filename, mediaType]) => {
+      const filePath = path.join(directory, filename)
+      await writeFile(filePath, PNG_BYTES)
+      const image = await imageFromFile(filePath)
+      assert.equal(image.mediaType, mediaType)
+      assert.equal(image.filename, filename)
+      assert.deepEqual(image.bytes, PNG_BYTES)
+    }),
+  )
 })

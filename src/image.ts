@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { mkdir, writeFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 
@@ -14,6 +14,18 @@ const MEDIA_EXTENSIONS: Readonly<Record<string, string>> = {
   "image/bmp": "bmp",
   "image/avif": "avif",
 }
+
+const EXTENSION_MEDIA_TYPES: Readonly<Record<string, string>> = {
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".gif": "image/gif",
+  ".webp": "image/webp",
+  ".bmp": "image/bmp",
+  ".avif": "image/avif",
+}
+
+const DEFAULT_FILE_MEDIA_TYPE = "image/png"
 
 export type ImageLikePart =
   | {
@@ -47,6 +59,14 @@ export function imageFromPart(part: unknown): ImageAsset | undefined {
   if (part.type === "media") return imageFromMediaPart(part)
   if (part.type === "file") return imageFromFilePart(part)
   return undefined
+}
+
+export async function imageFromFile(filePath: string): Promise<ImageAsset> {
+  const bytes = await readFile(filePath)
+  const mediaType =
+    EXTENSION_MEDIA_TYPES[path.extname(filePath).toLowerCase()] ??
+    DEFAULT_FILE_MEDIA_TYPE
+  return makeImage(bytes, mediaType, path.basename(filePath))
 }
 
 export async function saveImage(

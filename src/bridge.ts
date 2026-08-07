@@ -7,7 +7,7 @@ import {
   type ImageLikePart,
 } from "./image.js"
 
-const DEFAULT_QUESTION =
+export const DEFAULT_QUESTION =
   "Describe this image in detail. Preserve all visible text, code, error messages, UI layout, charts, and spatial relationships needed to answer a later question."
 
 export type BridgePart =
@@ -79,7 +79,7 @@ export class VisionBridge {
       if (!described) continue
       occurrence.message.content[occurrence.partIndex] = {
         type: "text",
-        text: replacementText(described),
+        text: visionDescriptionText(described),
       }
     }
   }
@@ -174,7 +174,7 @@ function cacheKey(imageDigest: string, question: string): string {
   return `${imageDigest}:${questionDigest}`
 }
 
-function replacementText(image: DescribedImage): string {
+export function visionDescriptionText(image: DescribedImage): string {
   return [
     "[Attached image]",
     `File URL: ${image.fileUrl}`,

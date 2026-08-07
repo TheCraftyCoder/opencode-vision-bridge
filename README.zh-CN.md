@@ -10,15 +10,16 @@
 4. 用包含本地 `file:` URL 的描述文字替换原图片 part；
 5. 让原本不支持 vision 的主模型继续正常处理请求。
 
-主模型不需要额外 system prompt、工具或调用约定。当前模型原生支持 `image` 输入时，插件不改动消息，图片直接交给该模型。
+自动附件路径不需要额外 system prompt、工具调用或调用约定。当前模型原生支持 `image` 输入时，插件不改动消息，图片直接交给该模型。
 
 ## 特性
 
-- **零侵入**：自动拦截，主模型不需要学习调用工具。
+- **零侵入自动路径**：附件拦截不依赖主模型发起工具调用。
 - **无副作用**：vision 请求通过隐藏内部 agent 在临时 session 上执行；不创建持久 session、不写入 user/assistant 消息、不触发会话自动重命名。
 - **图片落盘**：被桥接的图片（包括剪切板粘贴的）按 SHA-256 文件名保存，并在注入的描述中以 `file:///...` URL 引用。
 - **vision 来源可配置**：使用 OpenCode catalog 中已有的 provider 模型，或任意自定义 OpenAI 兼容端点（baseURL + apiKey）。
 - **vision 感知**：原生支持图片的模型不会被拦截。
+- **显式读取磁盘图片**：模型可通过 `read_image` 工具检查已经存在于磁盘上的图片。
 
 ## 环境
 
@@ -110,6 +111,26 @@ moeblack.vision-bridge
 
 插件会在内存 catalog 中注册 provider `moeblack-vision-bridge-custom`，使用 OpenCode V2 原生的 `@opencode-ai/ai/providers/openai-compatible` provider package，再通过同一套内部 agent 流程调用它。该 provider 不写回 OpenCode 配置文件。
 
+## 显式 `read_image` 工具
+
+消息附件仍默认走自动拦截流程，主模型不需要调用任何工具。`read_image` 是一条补充的显式路径，适合检查已经存在于磁盘上的图片，例如模型稍后需要查看的生成截图、图表或 UI 产物。
+
+| 参数 | 类型 | 必填 | 说明 |
+| --- | --- | --- | --- |
+| `filePath` | `string` | 是 | 绝对路径、以 `~/` 开头的路径，或相对于当前项目目录的路径。 |
+| `question` | `string` | 否 | 交给 vision 模型的聚焦问题。省略时，插件会要求通用的详细描述，并保留可见文字与布局信息。 |
+
+例如，可以要求模型使用以下参数调用 `read_image`：
+
+```json
+{
+  "filePath": "artifacts/ui-error.png",
+  "question": "终端中显示了什么错误，是哪一行源码引起的？"
+}
+```
+
+工具会读取该文件，将相同字节按 SHA-256 文件名保存到 `saveDir`，再交给配置的 vision 模型，并同时返回保存后的 `file:///...` URL 与文字描述。工具按扩展名识别 PNG、JPEG（`.jpg` 与 `.jpeg`）、GIF、WebP、BMP 和 AVIF，扩展名不区分大小写；未知扩展名按 `image/png` 发送。
+
 ## 工作方式
 
 ### 主请求拦截
@@ -187,5 +208,5 @@ npm run check
 - 当前 `@opencode-ai/plugin` 的 Promise `SessionDomain` 未暴露删除 session 所需的 `remove` 方法。插件使用同版本 `@opencode-ai/client` 发现并连接当前 managed background service，因此 `opencode2 --standalone` 暂不受支持。
 - V2 没有可直接携带图片且完全无 session 的 one-shot generate API。临时 session 不保留消息并会在调用结束时删除；实时订阅原始 server event stream 的调试客户端仍可能观察到对应的 create/delete 事件。
 - `context` runtime hook 当前没有进度 metadata 或 TUI heartbeat 通道。为避免创建可见消息，vision 等待期间不显示 V1 工具插件式的进度条。
-- OpenCode V2 当前只把 PNG、JPEG、GIF 和 WebP prompt attachment 放入模型上下文。其他二进制格式不会到达插件。
-- 描述缓存位于插件进程内存中，插件重载或后台服务重启后会重新调用 vision 模型。已经落盘的图片不会自动删除。
+- OpenCode V2 当前只把 PNG、JPEG、GIF 和 WebP prompt attachment 放入模型上下文，因此自动拦截受此限制；`read_image` 还可以直接从磁盘读取 BMP 和 AVIF 文件。
+- 自动 bridge 的描述缓存位于插件进程内存中，插件重载或后台服务重启后会重新调用 vision 模型。已经落盘的图片不会自动删除。

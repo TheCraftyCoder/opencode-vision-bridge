@@ -10,15 +10,16 @@ An automatic image-viewing plugin for **OpenCode 2.0 beta**. When the current se
 4. Replaces the original image part with the description text, including a local `file:` URL;
 5. Lets the non-vision main model continue processing the request normally.
 
-The main model needs no extra system prompt, no tools, and no calling convention. When the current model natively supports `image` input, the plugin leaves the messages untouched and the image goes straight to that model.
+The automatic attachment path needs no extra system prompt, tool call, or calling convention. When the current model natively supports `image` input, the plugin leaves the messages untouched and the image goes straight to that model.
 
 ## Features
 
-- **Zero-intrusion**: automatic interception — the main model never learns to call a tool.
+- **Zero-intrusion automatic path**: attachment interception does not depend on the main model making a tool call.
 - **No side effects**: the vision request runs through a hidden internal agent on a temporary session; no persistent session is created, no user/assistant message is admitted, no automatic session rename is triggered.
 - **Image saved to disk**: every bridged image (including clipboard pastes) is stored under its SHA-256 name and referenced by a `file:///...` URL in the injected description.
 - **Configurable vision source**: use an OpenCode provider model already in your catalog, or any custom OpenAI-compatible endpoint (baseURL + apiKey).
 - **Vision-aware**: models that natively accept images are never intercepted.
+- **Explicit disk-image reading**: the `read_image` tool lets the model inspect an image that already exists on disk.
 
 ## Requirements
 
@@ -110,6 +111,26 @@ This mode reuses the provider, credentials, model settings and variant already l
 
 The plugin registers an in-memory provider `moeblack-vision-bridge-custom` using the native `@opencode-ai/ai/providers/openai-compatible` package, then calls it through the same internal agent flow. This provider is never written back to the OpenCode config file.
 
+## Explicit `read_image` tool
+
+Automatic interception remains the default path for images attached to a message: the main model does not need to call any tool. `read_image` is a complementary explicit path for an image that already exists on disk, such as a generated screenshot, chart, or UI artifact that the model needs to inspect later.
+
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `filePath` | `string` | yes | Absolute path, a path beginning with `~/`, or a path relative to the current project directory. |
+| `question` | `string` | no | A focused question for the vision model. When omitted, the plugin requests a general detailed description that preserves visible text and layout. |
+
+For example, ask the model to use `read_image` with:
+
+```json
+{
+  "filePath": "artifacts/ui-error.png",
+  "question": "What error is shown in the terminal, and which source line caused it?"
+}
+```
+
+The tool reads the file, saves the same bytes in `saveDir` under their SHA-256 name, routes them through the configured vision model, and returns both the saved `file:///...` URL and the textual description. It recognizes PNG, JPEG (`.jpg` and `.jpeg`), GIF, WebP, BMP, and AVIF extensions case-insensitively; an unknown extension is sent as `image/png`.
+
 ## How it works
 
 ### Main-request interception
@@ -187,5 +208,5 @@ npm run check
 - The Promise `SessionDomain` of `@opencode-ai/plugin` does not expose the `remove` method needed to delete a session. The plugin uses the same-version `@opencode-ai/client` to discover and connect to the managed background service, so `opencode2 --standalone` is not supported yet.
 - V2 has no one-shot generate API that carries images without any session. The temporary session keeps no messages and is deleted when the call finishes; debugging clients that subscribe to the raw server event stream may still observe the corresponding create/delete events.
 - The `context` runtime hook currently has no progress metadata or TUI heartbeat channel. To avoid creating visible messages, no V1-style progress bar is shown while waiting for the vision call.
-- OpenCode V2 currently places only PNG, JPEG, GIF and WebP prompt attachments into the model context. Other binary formats never reach the plugin.
-- The description cache lives in plugin process memory; after a plugin reload or background-service restart the vision model is called again. Images already saved to disk are never deleted automatically.
+- OpenCode V2 currently places only PNG, JPEG, GIF and WebP prompt attachments into the model context. This limits automatic interception; `read_image` can also read BMP and AVIF files directly from disk.
+- The automatic bridge's description cache lives in plugin process memory; after a plugin reload or background-service restart the vision model is called again. Images already saved to disk are never deleted automatically.

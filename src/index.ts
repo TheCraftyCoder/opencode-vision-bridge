@@ -15,6 +15,7 @@ import {
 import { lazyLocalVisionClient } from "./client.js"
 import { parseOptions, type PluginOptionsInput } from "./config.js"
 import { OpenCodeVisionRunner, type ModelRef } from "./opencode-runner.js"
+import { ReadImageTool, type ReadImageInput } from "./read-image.js"
 import {
   VisionRequestRegistry,
   type RequestContextMessage,
@@ -41,6 +42,42 @@ export default Plugin.define({
     const bridge = new VisionBridge({
       saveDir: options.saveDir,
       describe: (request) => runner.describe(request),
+    })
+    const readImage = new ReadImageTool({
+      projectDirectory: catalog.location.directory,
+      saveDir: options.saveDir,
+      describe: (request) => runner.describe(request),
+    })
+
+    await ctx.tool.transform((tools) => {
+      tools.add({
+        name: "read_image",
+        description:
+          "Read an image file from disk with the configured vision model. Use this for an existing image path when visual details are needed.",
+        input: {
+          type: "object",
+          properties: {
+            filePath: {
+              type: "string",
+              minLength: 1,
+              description:
+                "Image file path. Supports absolute paths, ~/ paths, and paths relative to the project directory.",
+            },
+            question: {
+              type: "string",
+              minLength: 1,
+              description:
+                "Optional question to focus the visual analysis. Omit for a general detailed description.",
+            },
+          },
+          required: ["filePath"],
+          additionalProperties: false,
+        },
+        execute: async (input) => ({
+          content: await readImage.execute(input as ReadImageInput),
+        }),
+        options: { codemode: true },
+      })
     })
 
     await ctx.session.hook("context", async (event) => {
