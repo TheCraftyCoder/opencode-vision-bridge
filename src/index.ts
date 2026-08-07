@@ -79,9 +79,21 @@ export default Plugin.define({
           required: ["filePath"],
           additionalProperties: false,
         },
-        execute: async (input) => ({
-          content: await readImage.execute(input as ReadImageInput),
-        }),
+        output: {
+          type: "object",
+          properties: {
+            description: { type: "string" },
+          },
+          required: ["description"],
+          additionalProperties: false,
+        },
+        execute: async (input) => {
+          const text = await readImage.execute(input as ReadImageInput)
+          return {
+            output: { description: text },
+            content: text,
+          }
+        },
         options: { codemode: true },
       })
     })
