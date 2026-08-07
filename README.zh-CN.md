@@ -45,7 +45,7 @@ npm install
       "options": {
         "vision": {
           "type": "opencode",
-          "model": "zoaholic/gpt-5.6-luna-codex-20x"
+          "model": "opencode/mimo-v2.5-free"
         }
       }
     }
@@ -66,7 +66,7 @@ moeblack.vision-bridge
 | 配置项 | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
 | `vision.type` | `"opencode" \| "openai-compatible"` | `"opencode"` | vision 模型来源。 |
-| `vision.model` | `string` | `zoaholic/gpt-5.6-luna-codex-20x` | 内置来源使用 `provider/model[#variant]`；自定义来源填写上游模型 ID。 |
+| `vision.model` | `string` | `opencode/mimo-v2.5-free` | 内置来源使用 `provider/model[#variant]`；自定义来源填写上游模型 ID。 |
 | `vision.baseURL` | `string` | 无 | 自定义 OpenAI 兼容端点的 base URL。 |
 | `vision.apiKey` | `string` | 无 | 自定义 OpenAI 兼容端点的 bearer key。 |
 | `saveDir` | `string` | 项目内 `images/` | 图片保存目录。相对路径按插件项目根目录解析。 |
@@ -82,7 +82,7 @@ moeblack.vision-bridge
   "options": {
     "vision": {
       "type": "opencode",
-      "model": "zoaholic/gpt-5.6-luna-codex-20x"
+      "model": "opencode/mimo-v2.5-free"
     },
     "saveDir": "/path/to/opencode-vision-bridge/images",
     "timeoutMs": 180000

@@ -1,6 +1,6 @@
 import path from "node:path"
 
-export const DEFAULT_MODEL = "zoaholic/gpt-5.6-luna-codex-20x"
+export const DEFAULT_MODEL = "opencode/mimo-v2.5-free"
 export const DEFAULT_TIMEOUT_MS = 180_000
 
 export interface OpenCodeVisionOptions {

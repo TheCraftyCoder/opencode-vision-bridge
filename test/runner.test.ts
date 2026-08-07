@@ -35,7 +35,7 @@ test("runner uses a named transient session and deletes it after extracting text
     client: fakeClient(log),
     requests: new VisionRequestRegistry(),
     agent: "moeblack.vision-bridge.internal",
-    model: { providerID: "zoaholic", id: "vision" },
+    model: { providerID: "opencode", id: "vision" },
     timeoutMs: 30_000,
   })
 
@@ -66,7 +66,7 @@ test("runner interrupts and removes the transient session when generation fails"
     client,
     requests: new VisionRequestRegistry(),
     agent: "moeblack.vision-bridge.internal",
-    model: { providerID: "zoaholic", id: "vision" },
+    model: { providerID: "opencode", id: "vision" },
     timeoutMs: 30_000,
   })
 

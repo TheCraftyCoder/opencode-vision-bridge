@@ -45,7 +45,7 @@ Add a local entry to the V2 `plugins` config field. Absolute paths are supported
       "options": {
         "vision": {
           "type": "opencode",
-          "model": "zoaholic/gpt-5.6-luna-codex-20x"
+          "model": "opencode/mimo-v2.5-free"
         }
       }
     }
@@ -66,7 +66,7 @@ If the same config file is also used by OpenCode V1, keep the V1 `plugin` field 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `vision.type` | `"opencode" \| "openai-compatible"` | `"opencode"` | Vision model source. |
-| `vision.model` | `string` | `zoaholic/gpt-5.6-luna-codex-20x` | `provider/model[#variant]` for built-in sources; upstream model ID for custom sources. |
+| `vision.model` | `string` | `opencode/mimo-v2.5-free` | `provider/model[#variant]` for built-in sources; upstream model ID for custom sources. |
 | `vision.baseURL` | `string` | none | Base URL of a custom OpenAI-compatible endpoint. |
 | `vision.apiKey` | `string` | none | Bearer key for the custom OpenAI-compatible endpoint. |
 | `saveDir` | `string` | `images/` in the project | Directory where images are saved. Relative paths resolve against the plugin project root. |
@@ -82,7 +82,7 @@ If the same config file is also used by OpenCode V1, keep the V1 `plugin` field 
   "options": {
     "vision": {
       "type": "opencode",
-      "model": "zoaholic/gpt-5.6-luna-codex-20x"
+      "model": "opencode/mimo-v2.5-free"
     },
     "saveDir": "/path/to/opencode-vision-bridge/images",
     "timeoutMs": 180000

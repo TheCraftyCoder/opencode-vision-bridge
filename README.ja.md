@@ -45,7 +45,7 @@ V2 の `plugins` 設定フィールドにローカルエントリを追加しま
       "options": {
         "vision": {
           "type": "opencode",
-          "model": "zoaholic/gpt-5.6-luna-codex-20x"
+          "model": "opencode/mimo-v2.5-free"
         }
       }
     }
@@ -66,7 +66,7 @@ moeblack.vision-bridge
 | 設定 | 型 | デフォルト | 説明 |
 | --- | --- | --- | --- |
 | `vision.type` | `"opencode" \| "openai-compatible"` | `"opencode"` | vision モデルのソース。 |
-| `vision.model` | `string` | `zoaholic/gpt-5.6-luna-codex-20x` | 内蔵ソースでは `provider/model[#variant]`、カスタムソースでは上流モデル ID。 |
+| `vision.model` | `string` | `opencode/mimo-v2.5-free` | 内蔵ソースでは `provider/model[#variant]`、カスタムソースでは上流モデル ID。 |
 | `vision.baseURL` | `string` | なし | カスタム OpenAI 互換エンドポイントの base URL。 |
 | `vision.apiKey` | `string` | なし | カスタム OpenAI 互換エンドポイントの bearer key。 |
 | `saveDir` | `string` | プロジェクト内の `images/` | 画像の保存ディレクトリ。相対パスはプラグインプロジェクトルート基準で解決されます。 |
@@ -82,7 +82,7 @@ moeblack.vision-bridge
   "options": {
     "vision": {
       "type": "opencode",
-      "model": "zoaholic/gpt-5.6-luna-codex-20x"
+      "model": "opencode/mimo-v2.5-free"
     },
     "saveDir": "/path/to/opencode-vision-bridge/images",
     "timeoutMs": 180000
