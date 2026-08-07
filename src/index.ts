@@ -14,7 +14,8 @@ import {
 } from "./catalog.js"
 import { lazyLocalVisionClient } from "./client.js"
 import { parseOptions, type PluginOptionsInput } from "./config.js"
-import { OpenCodeVisionRunner, type ModelRef } from "./opencode-runner.js"
+import { ModelCapabilities } from "./model-capabilities.js"
+import { OpenCodeVisionRunner } from "./opencode-runner.js"
 import { ReadImageTool, type ReadImageInput } from "./read-image.js"
 import {
   VisionRequestRegistry,
@@ -28,15 +29,20 @@ export default Plugin.define({
   setup: async (ctx) => {
     const options = parseOptions(ctx.options as PluginOptionsInput, PROJECT_ROOT)
     const visionModel = await configureVisionCatalog(ctx, options)
-    const catalog = await ctx.catalog.model.list()
-    const capabilities = new ModelCapabilities(catalog.data)
+    const { location } = await ctx.catalog.model.list()
+    // Setup runs inside OpenCode's batched catalog boot. Read model data only
+    // when a request arrives so catalog.updated has committed the generation.
+    const capabilities = new ModelCapabilities(async () => {
+      const current = await ctx.catalog.model.list()
+      return current.data
+    })
     const requests = new VisionRequestRegistry()
     const runner = new OpenCodeVisionRunner({
       client: lazyLocalVisionClient(ctx.app.version),
       requests,
       agent: INTERNAL_AGENT_ID,
       model: visionModel,
-      directory: catalog.location.directory,
+      directory: location.directory,
       timeoutMs: options.timeoutMs,
     })
     const bridge = new VisionBridge({
@@ -44,7 +50,7 @@ export default Plugin.define({
       describe: (request) => runner.describe(request),
     })
     const readImage = new ReadImageTool({
-      projectDirectory: catalog.location.directory,
+      projectDirectory: location.directory,
       saveDir: options.saveDir,
       describe: (request) => runner.describe(request),
     })
@@ -97,39 +103,9 @@ export default Plugin.define({
       const messages = event.messages as unknown as BridgeMessage[]
       if (!hasImageParts(messages)) return
       await bridge.transform({
-        modelSupportsVision: capabilities.supportsVision(event.model),
+        modelSupportsVision: await capabilities.supportsVision(event.model),
         messages,
       })
     })
   },
 })
-
-interface CatalogModel {
-  readonly id: string
-  readonly providerID: string
-  readonly capabilities: {
-    readonly input: ReadonlyArray<string>
-  }
-}
-
-class ModelCapabilities {
-  readonly #models: ReadonlyMap<string, CatalogModel>
-
-  constructor(models: ReadonlyArray<CatalogModel>) {
-    this.#models = new Map(
-      models.map((model) => [modelKey(model.providerID, model.id), model]),
-    )
-  }
-
-  supportsVision(model: ModelRef): boolean {
-    const info = this.#models.get(modelKey(model.providerID, model.id))
-    if (!info) {
-      throw new Error(`Active model is absent from the catalog: ${model.providerID}/${model.id}`)
-    }
-    return info.capabilities.input.includes("image")
-  }
-}
-
-function modelKey(providerID: string, modelID: string): string {
-  return `${providerID}\u0000${modelID}`
-}
