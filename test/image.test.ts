@@ -5,6 +5,8 @@ import path from "node:path"
 import test from "node:test"
 
 import {
+  attachmentFromPart,
+  attachmentFromUri,
   imageFromFile,
   imageFromPart,
   saveImage,
@@ -47,6 +49,34 @@ test("imageFromPart ignores non-image parts", () => {
     imageFromPart({ type: "media", mediaType: "text/plain", data: "aGVsbG8=" }),
     undefined,
   )
+})
+
+test("attachmentFromPart reads PDF media parts", () => {
+  const bytes = Buffer.from("%PDF-1.7")
+  const attachment = attachmentFromPart({
+    type: "media",
+    mediaType: "application/pdf",
+    data: `data:application/pdf;base64,${bytes.toString("base64")}`,
+    filename: "report.pdf",
+  })
+
+  assert.ok(attachment)
+  assert.equal(attachment.mediaType, "application/pdf")
+  assert.equal(attachment.filename, "report.pdf")
+  assert.deepEqual(attachment.bytes, bytes)
+})
+
+test("attachmentFromUri reads pasted PDF data URLs", async () => {
+  const bytes = Buffer.from("%PDF-1.7")
+  const attachment = await attachmentFromUri(
+    `data:application/pdf;base64,${bytes.toString("base64")}`,
+    "pasted.pdf",
+  )
+
+  assert.ok(attachment)
+  assert.equal(attachment.mediaType, "application/pdf")
+  assert.equal(attachment.filename, "pasted.pdf")
+  assert.deepEqual(attachment.bytes, bytes)
 })
 
 test("saveImage writes a deterministic digest-named file and returns its file URL", async () => {

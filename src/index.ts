@@ -4,7 +4,8 @@ import { Plugin } from "@opencode/plugin"
 
 import {
   VisionBridge,
-  hasImageParts,
+  hasAttachmentParts,
+  type BridgePrompt,
   type BridgeMessage,
 } from "./bridge.js"
 import {
@@ -133,12 +134,20 @@ export default Plugin.define({
       if (prepareInternalVisionRequest(event)) return
 
       const messages = event.messages as unknown as BridgeMessage[]
-      if (!hasImageParts(messages)) return
+      if (!hasAttachmentParts(messages)) return
       const session = await ctx.session.get({ sessionID: event.sessionID })
       await bridgeFor(session.location.directory).transform({
-        modelSupportsVision: await capabilities.supportsVision(event.model),
+        modelInputCapabilities: await capabilities.inputCapabilities(event.model),
         messages,
       })
+    })
+
+    await ctx.session.hook("prompt", async (event) => {
+      if (!event.prompt.files?.length) return
+      const session = await ctx.session.get({ sessionID: event.sessionID })
+      await bridgeFor(session.location.directory).transformPrompt(
+        event.prompt as BridgePrompt,
+      )
     })
 
     await ctx.session.hook("generate", async (event) => {

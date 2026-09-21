@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.0 - 2026-09-21
+
+- Defaulted the bridge model to `zai-coding-plan/glm-5.3-flash`, matching the GLM Coding Plan catalog in OpenCode v2.
+- Added pasted-PDF interception in the v2 `prompt` hook, rendering pages to PNG batches before OpenCode omits unsupported binary attachments from model context.
+- Generalized attachment decoding, SHA-256 storage, caching, request injection, prompts, and output labels for both images and PDFs.
+- Made context bridging capability-specific so a model can receive images natively while unsupported PDFs are still described as text.
+- Added coverage for PDF data URLs, prompt mutation, mixed model capabilities, and non-media prompt attachments.
+
 ## 1.1.0 - 2026-09-21
 
 - Prevented failed automatic vision requests from aborting the parent OpenCode session. The bridge now preserves the attachment reference and reports that visual analysis was unavailable.

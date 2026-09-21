@@ -108,8 +108,14 @@ export class OpenCodeVisionRunner {
 }
 
 function visionPrompt(request: VisionDescriptionRequest): string {
+  const source = request.source
+  const attachmentType = source ? "PDF pages" : "image"
+  const pageContext = source
+    ? `This batch contains PDF pages ${source.pageStart}-${source.pageEnd} of ${source.pageCount}. Preserve page boundaries and page numbers in the response.`
+    : undefined
   return [
-    "Inspect the attached image and provide the visual evidence needed by another model.",
+    `Inspect the attached ${attachmentType} and provide the evidence needed by another model.`,
+    ...(pageContext ? [pageContext] : []),
     `Saved local reference: ${request.fileUrl}`,
     "Question or surrounding user text:",
     request.question,

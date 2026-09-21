@@ -2,106 +2,82 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-**OpenCode 2.0 beta** 向けの自動画像閲覧プラグイン。現在のセッションモデルが画像入力に対応していない場合、プロバイダーへのリクエスト送信前にプラグインが自動的に以下を行います。
+テキスト専用の **OpenCode v2** セッションで、画像と PDF を自動的に理解できるようにするプラグインです。
 
-1. `ctx.session.hook("context")` のメッセージから画像を抽出する；
-2. 画像を SHA-256 ファイル名でローカルに保存する；
-3. OpenCode の agent 経路を通して、設定済みの vision 対応モデルに文字による説明を生成させる；
-4. 元の画像パートを、ローカル `file:` URL を含む説明文に置き換える；
-5. vision 非対応のメインモデルがそのままリクエスト処理を続行できるようにする。
+メインセッションでは `zai-coding-plan/glm-5.3` などのテキスト専用モデルを使用できます。画像または PDF を貼り付けると、プラグインが添付ファイルと質問を `zai-coding-plan/glm-5.3-flash` に送り、その説明文をメインモデルへ返します。
 
-添付画像の自動経路には、追加の system prompt、ツール呼び出し、呼び出し規約は不要です。現在のモデルが `image` 入力をネイティブにサポートしている場合はメッセージを変更せず、画像はそのモデルに直接渡されます。
+## 機能
 
-## 特徴
-
-- **ゼロ侵入の自動経路**: 添付画像のインターセプトは、メインモデルによるツール呼び出しに依存しません。
-- **副作用なし**: vision リクエストは非表示の内部エージェントが一時セッション上で実行します。永続セッションを作らず、user/assistant メッセージも書き込まず、セッションの自動リネームも発生しません。
-- **画像を保存**: ブリッジされた画像（クリップボードからの貼り付けを含む）は SHA-256 ファイル名で保存され、注入された説明文内の `file:///...` URL から参照できます。
-- **vision ソースを設定可能**: OpenCode カタログ内の既存プロバイダーモデル、または任意のカスタム OpenAI 互換エンドポイント（baseURL + apiKey）を使用できます。
-- **vision 認識**: 画像をネイティブに受け入れられるモデルはインターセプトされません。
-- **ディスク上の画像を明示的に読み取り**: `read_image` ツールを使って、ディスク上にすでに存在する画像をモデルが確認できます。
+- 画像: v2 の `context` hook で現在のモデル能力を確認します。テキスト専用モデルには GLM-5.3-Flash の説明を渡し、画像入力対応モデルには元の画像をそのまま渡します。
+- PDF: OpenCode の添付処理で省略される前に v2 の `prompt` hook で処理し、バイナリ添付を説明文に置き換えます。
+- ブリッジした添付は SHA-256 名で `images/` に保存され、注入されるテキストにはローカル `file:` URL が含まれます。
+- vision 呼び出しが失敗した場合は、解析できなかったことを明示します。内容を推測せず、メインモデルのリクエストも中断しません。
+- `read_image` ツールでディスク上の既存画像を確認できます。
 
 ## 必要環境
 
-- OpenCode 2.0 beta: `@opencode-ai/cli@0.0.0-next-16977`
-- Node.js 22 以降
-- プラグインの依存関係は対象の OpenCode beta と同じビルドに固定（`0.0.0-next-16977`）
+- OpenCode 2.0.12 以降
+- Node.js 22.13 以降
+- `zai-coding-plan/glm-5.3-flash`、または設定済みの別のマルチモーダルモデルへのアクセス
 
-依存関係のインストール:
+## インストール
 
 ```bash
-cd opencode-vision-bridge
-npm install
+opencode plugin add @the-crafty-coder/opencode-vision-bridge@1.2.0
 ```
 
-## OpenCode への組み込み
+既定では GLM-5.3-Flash を使うため、追加オプションは不要です。
 
-V2 の `plugins` 設定フィールドにローカルエントリを追加します。絶対パスは V2 ネイティブのプラグインローダーでサポートされています:
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "zai-coding-plan/glm-5.3",
+  "plugins": ["@the-crafty-coder/opencode-vision-bridge@1.2.0"]
+}
+```
+
+変更後に `opencode service restart` を実行してください。プラグイン ID は `moeblack.vision-bridge` です。
+
+## 設定
+
+既定値を変更する場合のみオブジェクト形式を使います。
 
 ```jsonc
 {
   "plugins": [
     {
-      "package": "/path/to/opencode-vision-bridge/src/index.ts",
+      "package": "@the-crafty-coder/opencode-vision-bridge@1.2.0",
       "options": {
         "vision": {
           "type": "opencode",
-          "model": "opencode/mimo-v2.5-free"
-        }
+          "model": "zai-coding-plan/glm-5.3-flash"
+        },
+        "saveDir": "./images",
+        "timeoutMs": 180000
       }
     }
   ]
 }
 ```
 
-プラグイン ID:
-
-```text
-moeblack.vision-bridge
-```
-
-同じ設定ファイルを OpenCode V1 でも使う場合は、V1 の `plugin` フィールドを残しつつ V2 の `plugins` フィールドを追加してください。V1 プラグインの実装は V2 では動作しません。
-
-## 設定項目
-
-| 設定 | 型 | デフォルト | 説明 |
+| 設定 | 型 | 既定値 | 説明 |
 | --- | --- | --- | --- |
-| `vision.type` | `"opencode" \| "openai-compatible"` | `"opencode"` | vision モデルのソース。 |
-| `vision.model` | `string` | `opencode/mimo-v2.5-free` | 内蔵ソースでは `provider/model[#variant]`、カスタムソースでは上流モデル ID。 |
-| `vision.baseURL` | `string` | なし | カスタム OpenAI 互換エンドポイントの base URL。 |
-| `vision.apiKey` | `string` | なし | カスタム OpenAI 互換エンドポイントの bearer key。 |
-| `saveDir` | `string` | プロジェクト内の `images/` | 画像の保存ディレクトリ。相対パスはプラグインプロジェクトルート基準で解決されます。 |
-| `timeoutMs` | 正の整数 | `180000` | vision 生成 1 回あたりのタイムアウト（ミリ秒）。 |
+| `vision.type` | `"opencode" \| "openai-compatible"` | `"opencode"` | マルチモーダルモデルの供給元。 |
+| `vision.model` | `string` | `"zai-coding-plan/glm-5.3-flash"` | OpenCode では `provider/model[#variant]`、カスタムでは上流モデル ID。 |
+| `vision.baseURL` | `string` | なし | OpenAI 互換エンドポイントの URL。 |
+| `vision.apiKey` | `string` | なし | OpenAI 互換エンドポイントの bearer key。 |
+| `saveDir` | `string` | プラグイン内の `images/` | 添付ファイルの保存先。 |
+| `timeoutMs` | 正の整数 | `180000` | 1 回の生成タイムアウト（ミリ秒）。 |
 
-### 既存の OpenCode プロバイダーを使用する場合
-
-`vision.model` は、現在の OpenCode カタログに存在し `capabilities.input` に `image` を含むモデルである必要があります:
+カスタム OpenAI 互換エンドポイント:
 
 ```jsonc
 {
-  "package": "/path/to/opencode-vision-bridge/src/index.ts",
-  "options": {
-    "vision": {
-      "type": "opencode",
-      "model": "opencode/mimo-v2.5-free"
-    },
-    "saveDir": "/path/to/opencode-vision-bridge/images",
-    "timeoutMs": 180000
-  }
-}
-```
-
-このモードでは、OpenCode がすでに読み込んでいるプロバイダー・資格情報・モデル設定・バリアントを再利用します。
-
-### カスタム OpenAI 互換エンドポイントを使用する場合
-
-```jsonc
-{
-  "package": "/path/to/opencode-vision-bridge/src/index.ts",
+  "package": "@the-crafty-coder/opencode-vision-bridge@1.2.0",
   "options": {
     "vision": {
       "type": "openai-compatible",
-      "model": "my-vision-model",
+      "model": "glm-5.3-flash",
       "baseURL": "https://vision.example.com/v1",
       "apiKey": "replace-with-key"
     }
@@ -109,104 +85,20 @@ moeblack.vision-bridge
 }
 ```
 
-プラグインはネイティブの `@opencode-ai/ai/providers/openai-compatible` パッケージを使ってメモリ内プロバイダー `moeblack-vision-bridge-custom` を登録し、同じ内部 agent フローで呼び出します。このプロバイダーは OpenCode の設定ファイルに書き戻されません。
-
-## 明示的な `read_image` ツール
-
-メッセージに添付された画像には、引き続き自動インターセプトが既定の経路として使われるため、メインモデルがツールを呼び出す必要はありません。`read_image` は、生成済みのスクリーンショット、チャート、UI 成果物など、ディスク上にすでに存在し、後からモデルが確認する必要のある画像向けの補助的な明示経路です。
-
-| パラメーター | 型 | 必須 | 説明 |
-| --- | --- | --- | --- |
-| `filePath` | `string` | はい | 絶対パス、`~/` で始まるパス、または現在のプロジェクトディレクトリからの相対パス。 |
-| `question` | `string` | いいえ | vision モデルに渡す焦点を絞った質問。省略すると、可視テキストとレイアウトを保持する汎用的で詳細な説明を要求します。 |
-
-例えば、次の引数で `read_image` を使うようモデルに依頼します:
-
-```json
-{
-  "filePath": "artifacts/ui-error.png",
-  "question": "端末に表示されているエラーと、その原因になったソース行を教えてください。"
-}
-```
-
-ツールはファイルを読み取り、同じバイト列を SHA-256 ファイル名で `saveDir` に保存し、設定済みの vision モデルへ渡して、保存先の `file:///...` URL と文字による説明の両方を返します。拡張子の大文字・小文字を区別せず、PNG、JPEG（`.jpg` と `.jpeg`）、GIF、WebP、BMP、AVIF を認識します。不明な拡張子は `image/png` として送信されます。
-
-## 動作の仕組み
-
-### メインリクエストのインターセプト
-
-V2 のモデルコンテキストでは画像が次のように正規化されます:
-
-```ts
-{
-  type: "media",
-  mediaType: "image/png",
-  data: "data:image/png;base64,..."
-}
-```
-
-プラグインは beta 期間中のメッセージ形状の変化に備えて、V1 形式の data-URL `file` パートも認識します。モデルの能力は V2 モデルカタログから取得し、`capabilities.input` に `image` が含まれる場合は保存も説明もせずに即座に戻ります。
-
-### 副作用なしの vision 生成
-
-V2 のグローバル `/api/generate` エンドポイントは添付ファイルを受け付けず、セッションの agent loop はツールを実行し得ます。そのためプラグインは次の手順を使います:
-
-1. 固定の非デフォルトタイトルを持つ空の一時セッションを作成し、非表示の内部エージェントと vision モデルを指定する；
-2. 画像をプラグインのインメモリリクエストテーブルにのみ保持する；
-3. `session.generate` でワンショット生成を呼び出す；
-4. その生成リクエストの `context` hook 内で画像を注入し、tools を空にする；
-5. `session.generate` が直接返すテキストを読み取る；
-6. `finally` で一時セッションを削除する。
-
-このフローは一時セッションにプロンプトを admit せず、user/assistant メッセージも書き込まず、自動タイトル生成の条件も満たしません。内部エージェントはマルチステップの agent loop に入らず、ファイル・シェル・ネットワークツールを実行できません。
-
 ## 検証
 
-### 1. 静的チェックとテスト
-
 ```bash
-cd opencode-vision-bridge
+npm install
 npm run check
 ```
 
-### 2. プラグインが読み込まれたことを確認
+OpenCode でテキスト専用のメインモデルを選び、画像と PDF をそれぞれ貼り付けて質問します。回答が添付内容を使っており、`saveDir` にダイジェスト名の画像と `.pdf` が作成されることを確認してください。次に画像対応モデルへ切り替え、画像貼り付け時に新しい保存画像が作られないことを確認します。
 
-設定変更後、バックグラウンドサービスを再起動:
+## 制約
 
-```bash
-opencode2 service restart
-opencode2 api get /api/plugin
-```
+- 既定モデルが OpenCode catalog で利用可能かつ認証済みである必要があります。別のモデルは `vision.model` で指定できます。
+- 上流モデルのファイルサイズ、個数、形式制限は引き続き適用されます。
+- 説明キャッシュはプロセス内のみです。再読み込みや再起動後は再解析され、保存済みファイルは自動削除されません。
+- OpenCode Promise プラグイン API は現在 session 削除を公開していません。内部生成はメッセージを書き込みませんが、OpenCode が整理するまで空の内部 session が見える場合があります。
 
-返ってくる `data` に以下が含まれるはずです:
-
-```json
-{"id":"moeblack.vision-bridge"}
-```
-
-### 3. 機能確認
-
-1. `text` 入力のみサポートするモデルを選択する；
-2. PNG・JPEG・GIF・WebP の画像を貼り付ける；
-3. 画像の内容を直接質問する；
-4. 回答が画像の情報を使っていることを確認する；
-5. `saveDir` に新しい `<sha256>.<ext>` ファイルが増えることを確認する；
-6. 次にネイティブ vision モデルを選んで画像を貼り付け、リクエストが正常に完了し bridge が画像ファイルを追加しないことを確認する。
-
-## 開発コマンド
-
-```bash
-npm test
-npm run typecheck
-npm run check
-```
-
-## Beta の制限
-
-- プラグイン API はまだ beta です。`opencode2` をアップグレードしたら、3 つの `@opencode-ai/*` 依存を同じビルドに揃え、読み込み検証をやり直してください。
-- 同じ設定に V1 用の旧 `plugin: ["opencode-see-image"]` を残している場合、`next-16977` はその V1 パッケージを V2 API で解析しようとし、サーバーログに `Expected object` の互換性警告を記録します。`moeblack.vision-bridge` の読み込みには影響しません。警告を消すには旧フィールドを削除するしかありませんが、V1 プラグインの接続は失われます。
-- 現在の `@opencode-ai/plugin` の Promise `SessionDomain` は、セッション削除に必要な `remove` メソッドを公開していません。プラグインは同バージョンの `@opencode-ai/client` を使って managed background service を発見・接続するため、`opencode2 --standalone` はまだサポートされていません。
-- V2 には、セッションなしで画像を運べる one-shot generate API がありません。一時セッションはメッセージを保持せず、呼び出し終了時に削除されます。生のサーバーイベントストリームを購読するデバッグクライアントは、対応する create/delete イベントを観察する可能性があります。
-- `context` runtime hook には現在、進行状況のメタデータや TUI のハートビートチャネルがありません。可視メッセージを作らないため、vision 呼び出しの待機中に V1 ツールプラグイン風のプログレスバーは表示されません。
-- OpenCode V2 は現在、PNG・JPEG・GIF・WebP のプロンプト添付のみをモデルコンテキストに入れるため、自動インターセプトにはこの制限があります。`read_image` は BMP と AVIF もディスクから直接読み取れます。
-- 自動ブリッジの説明キャッシュはプラグインプロセスのメモリ内にあります。プラグインのリロードやバックグラウンドサービスの再起動後は vision モデルが再度呼び出されます。保存済みの画像が自動削除されることはありません。
+実装詳細と `read_image` の引数は [English README](README.md) を参照してください。

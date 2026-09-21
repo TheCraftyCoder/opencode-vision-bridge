@@ -46,6 +46,24 @@ test("model capabilities read the current catalog for every request", async () =
   assert.equal(loads, 2)
 })
 
+test("inputCapabilities exposes PDF support independently from image support", async () => {
+  const capabilities = new ModelCapabilities(async () => [
+    {
+      id: "glm-5.3-flash",
+      providerID: "opencode",
+      capabilities: { input: ["text", "image", "pdf"] },
+    },
+  ])
+
+  assert.deepEqual(
+    await capabilities.inputCapabilities({
+      providerID: "opencode",
+      id: "glm-5.3-flash",
+    }),
+    new Set(["text", "image", "pdf"]),
+  )
+})
+
 test("model capabilities reject a model absent from the current catalog", async () => {
   const capabilities = new ModelCapabilities(async () => [TEXT_MODEL])
 

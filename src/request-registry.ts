@@ -30,16 +30,29 @@ export class VisionRequestRegistry {
       .reverse()
       .find((candidate) => candidate.role === "user")
     if (!message) {
-      messages.push({ role: "user", content: [mediaPart(request)] })
+      messages.push({ role: "user", content: mediaParts(request) })
       return true
     }
 
-    message.content.push(mediaPart(request))
+    message.content.push(...mediaParts(request))
     return true
   }
 }
 
-function mediaPart(request: VisionDescriptionRequest): RequestContextPart {
+function mediaParts(
+  request: VisionDescriptionRequest,
+): RequestContextPart[] {
+  return [
+    mediaPart(request),
+    ...(request.additionalMedia ?? []).map(mediaPart),
+  ]
+}
+
+function mediaPart(request: {
+  readonly dataUrl: string
+  readonly mediaType: string
+  readonly filename?: string
+}): RequestContextPart {
   return {
     type: "media",
     mediaType: request.mediaType,

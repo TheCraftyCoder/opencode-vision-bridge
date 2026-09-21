@@ -3,7 +3,7 @@ import path from "node:path"
 
 import {
   DEFAULT_QUESTION,
-  visionDescriptionText,
+  attachmentDescriptionText,
   type VisionDescriptionRequest,
 } from "./bridge.js"
 import { imageFromFile, saveImage } from "./image.js"
@@ -40,6 +40,9 @@ export class ReadImageTool {
       this.#homeDirectory,
     )
     const image = await imageFromFile(sourcePath)
+    if (!image.mediaType.startsWith("image/")) {
+      throw new TypeError(`read_image only accepts image files: ${sourcePath}`)
+    }
     const saved = await saveImage(image, this.#saveDir)
     const description = (
       await this.#describe({
@@ -53,7 +56,12 @@ export class ReadImageTool {
     if (description === "") {
       throw new Error("Vision model returned an empty description")
     }
-    return visionDescriptionText({ description, fileUrl: saved.url })
+    return attachmentDescriptionText({
+      description,
+      fileUrl: saved.url,
+      mediaType: image.mediaType,
+      ...(image.filename === undefined ? {} : { filename: image.filename }),
+    })
   }
 }
 

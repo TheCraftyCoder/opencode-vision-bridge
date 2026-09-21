@@ -1,6 +1,7 @@
 import path from "node:path"
 
 export const DEFAULT_TIMEOUT_MS = 180_000
+export const DEFAULT_VISION_MODEL = "zai-coding-plan/glm-5.3-flash"
 
 export interface OpenCodeVisionOptions {
   readonly type: "opencode"
@@ -53,9 +54,7 @@ export function parseOptions(
 
 function parseVision(input: PluginOptionsInput["vision"]): VisionOptions {
   if (input === undefined) {
-    throw new TypeError(
-      "vision must be configured with an authenticated vision-capable provider model or OpenAI-compatible endpoint",
-    )
+    return { type: "opencode", model: DEFAULT_VISION_MODEL }
   }
 
   if (input?.type === "openai-compatible") {

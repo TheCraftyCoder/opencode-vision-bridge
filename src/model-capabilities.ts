@@ -17,7 +17,7 @@ export class ModelCapabilities {
     this.#load = load
   }
 
-  async supportsVision(model: ModelRef): Promise<boolean> {
+  async inputCapabilities(model: ModelRef): Promise<ReadonlySet<string>> {
     const models = await this.#load()
     const info = models.find(
       (candidate) =>
@@ -28,6 +28,12 @@ export class ModelCapabilities {
         `Active model is absent from the catalog: ${model.providerID}/${model.id}`,
       )
     }
-    return info.capabilities.input.includes("image")
+    return new Set(
+      info.capabilities.input.map((capability) => capability.toLowerCase()),
+    )
+  }
+
+  async supportsVision(model: ModelRef): Promise<boolean> {
+    return (await this.inputCapabilities(model)).has("image")
   }
 }

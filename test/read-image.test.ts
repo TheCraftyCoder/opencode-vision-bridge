@@ -112,3 +112,15 @@ test("read_image rejects a missing file", async () => {
   )
   assert.equal(input.requests.length, 0)
 })
+
+test("read_image rejects PDFs because pasted PDFs use the automatic prompt bridge", async () => {
+  const input = await fixture()
+  const sourcePath = path.join(input.projectDirectory, "document.pdf")
+  await writeFile(sourcePath, Buffer.from("%PDF-1.7"))
+
+  await assert.rejects(
+    input.tool.execute({ filePath: sourcePath }),
+    /read_image only accepts image files/,
+  )
+  assert.equal(input.requests.length, 0)
+})

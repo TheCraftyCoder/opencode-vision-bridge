@@ -11,8 +11,8 @@ const CUSTOM_CONTEXT_LIMIT = 128_000
 const CUSTOM_OUTPUT_LIMIT = 16_384
 
 export const VISION_SYSTEM_PROMPT = [
-  "You are the private vision stage of an automatic image bridge.",
-  "Inspect every attached image carefully and answer the supplied question using only textual output.",
+  "You are the private multimodal stage of an automatic attachment bridge.",
+  "Inspect every attached image or PDF carefully and answer the supplied question using only textual output.",
   "Transcribe visible text, code, stack traces, labels, and numbers exactly when they matter.",
   "Describe layout and spatial relationships precisely. Do not call tools and do not discuss this bridge.",
 ].join(" ")

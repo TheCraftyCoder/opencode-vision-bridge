@@ -3,17 +3,20 @@ import test from "node:test"
 import path from "node:path"
 
 import {
+  DEFAULT_VISION_MODEL,
   parseOptions,
   type PluginOptionsInput,
 } from "../src/config.js"
 
 const projectRoot = "/tmp/plugin-root"
 
-test("parseOptions requires an explicit vision provider", () => {
-  assert.throws(
-    () => parseOptions({}, projectRoot),
-    /vision must be configured/,
-  )
+test("parseOptions defaults to GLM-5.3-Flash through OpenCode", () => {
+  const options = parseOptions({}, projectRoot)
+
+  assert.deepEqual(options.vision, {
+    type: "opencode",
+    model: DEFAULT_VISION_MODEL,
+  })
 })
 
 test("parseOptions accepts an explicit OpenCode provider model", () => {

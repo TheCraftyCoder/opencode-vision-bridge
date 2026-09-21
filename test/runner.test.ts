@@ -87,3 +87,37 @@ test("runner interrupts and removes the transient session when generation fails"
     "remove",
   ])
 })
+
+test("runner identifies rendered PDF page batches in the vision prompt", async () => {
+  let prompt = ""
+  const client = fakeClient([])
+  client.session.generate = async (input) => {
+    prompt = input.prompt
+    return { text: "PDF result" }
+  }
+  const runner = new OpenCodeVisionRunner({
+    client,
+    requests: new VisionRequestRegistry(),
+    agent: "moeblack.vision-bridge.internal",
+    model: { providerID: "opencode", id: "glm-5.3-flash" },
+    timeoutMs: 30_000,
+  })
+
+  await runner.describe({
+    dataUrl: "data:image/png;base64,cGFnZQ==",
+    mediaType: "image/png",
+    filename: "report-page-1.png",
+    source: {
+      mediaType: "application/pdf",
+      filename: "report.pdf",
+      pageStart: 1,
+      pageEnd: 8,
+      pageCount: 12,
+    },
+    fileUrl: "file:///tmp/report.pdf",
+    question: "Summarize it",
+  })
+
+  assert.match(prompt, /attached PDF pages/)
+  assert.match(prompt, /pages 1-8 of 12/)
+})
