@@ -41,20 +41,20 @@ npm install
 Install the published package, then configure it in the V2 `plugins` field:
 
 ```bash
-opencode plugin add @the-crafty-coder/opencode-vision-bridge@1.0.4
+opencode plugin add @the-crafty-coder/opencode-vision-bridge@1.1.0
 ```
 
-The equivalent Git release is `github:TheCraftyCoder/opencode-vision-bridge#v1.0.4`.
+The equivalent Git release is `github:TheCraftyCoder/opencode-vision-bridge#v1.1.0`.
 
 ```jsonc
 {
   "plugins": [
     {
-      "package": "@the-crafty-coder/opencode-vision-bridge@1.0.4",
+      "package": "@the-crafty-coder/opencode-vision-bridge@1.1.0",
       "options": {
         "vision": {
           "type": "opencode",
-          "model": "opencode/mimo-v2.5-free"
+          "model": "your-provider/vision-model"
         }
       }
     }
@@ -75,7 +75,7 @@ If the same config file is also used by OpenCode V1, keep the V1 `plugin` field 
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
 | `vision.type` | `"opencode" \| "openai-compatible"` | `"opencode"` | Vision model source. |
-| `vision.model` | `string` | `opencode/mimo-v2.5-free` | `provider/model[#variant]` for built-in sources; upstream model ID for custom sources. |
+| `vision.model` | `string` | required | `provider/model[#variant]` for built-in sources; upstream model ID for custom sources. |
 | `vision.baseURL` | `string` | none | Base URL of a custom OpenAI-compatible endpoint. |
 | `vision.apiKey` | `string` | none | Bearer key for the custom OpenAI-compatible endpoint. |
 | `saveDir` | `string` | `images/` in the project | Directory where images are saved. Relative paths resolve against the plugin project root. |
@@ -91,7 +91,7 @@ If the same config file is also used by OpenCode V1, keep the V1 `plugin` field 
   "options": {
     "vision": {
       "type": "opencode",
-      "model": "opencode/mimo-v2.5-free"
+      "model": "your-provider/vision-model"
     },
     "saveDir": "/path/to/opencode-vision-bridge/images",
     "timeoutMs": 180000
@@ -209,9 +209,10 @@ npm run typecheck
 npm run check
 ```
 
-## Beta limitations
+## Requirements and constraints
 
 - OpenCode plugin APIs can change between releases. After upgrading OpenCode, align the three `@opencode/*` dependencies and rerun the load verification.
+- The bridge requires an explicitly configured, authenticated vision-capable provider model or OpenAI-compatible endpoint. OpenCode's `opencode/*-free` models currently reject the bridge's internal transient-session requests and must not be configured as its vision source. If a configured provider later becomes unavailable, the automatic bridge preserves the parent session and injects an explicit unavailable-analysis note; it never invents visual content.
 - The plugin uses the same-version `@opencode/client` to discover and connect to the managed background service, so `opencode --standalone` is not supported yet.
 - V2 has no one-shot generate API that carries images without any session. The temporary session keeps no messages and is deleted when the call finishes; debugging clients that subscribe to the raw server event stream may still observe the corresponding create/delete events.
 - The `context` runtime hook currently has no progress metadata or TUI heartbeat channel. To avoid creating visible messages, no V1-style progress bar is shown while waiting for the vision call.

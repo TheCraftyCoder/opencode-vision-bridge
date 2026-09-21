@@ -104,22 +104,40 @@ export class VisionBridge {
     occurrence: Occurrence,
     fileUrl: string,
   ): Promise<DescribedImage> {
-    const description = (
-      await this.#describe({
-        dataUrl: occurrence.image.dataUrl,
-        mediaType: occurrence.image.mediaType,
-        ...(occurrence.image.filename === undefined
-          ? {}
-          : { filename: occurrence.image.filename }),
-        fileUrl,
-        question: occurrence.question,
-      })
-    ).trim()
+    let description: string
+    try {
+      description = (
+        await this.#describe({
+          dataUrl: occurrence.image.dataUrl,
+          mediaType: occurrence.image.mediaType,
+          ...(occurrence.image.filename === undefined
+            ? {}
+            : { filename: occurrence.image.filename }),
+          fileUrl,
+          question: occurrence.question,
+        })
+      ).trim()
+    } catch (error) {
+      return { description: unavailableDescription(error), fileUrl }
+    }
     if (description === "") {
-      throw new Error("Vision model returned an empty description")
+      return {
+        description:
+          "Image analysis was unavailable because the configured vision model returned an empty description. Do not infer visual content from this attachment.",
+        fileUrl,
+      }
     }
     return { description, fileUrl }
   }
+}
+
+function unavailableDescription(error: unknown): string {
+  const reason = error instanceof Error ? error.message : String(error)
+  return [
+    "Image analysis was unavailable from the configured vision model.",
+    `Reason: ${reason}`,
+    "Do not infer visual content from this attachment.",
+  ].join(" ")
 }
 
 export function hasImageParts(messages: readonly BridgeMessage[]): boolean {

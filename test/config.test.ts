@@ -3,18 +3,29 @@ import test from "node:test"
 import path from "node:path"
 
 import {
-  DEFAULT_MODEL,
   parseOptions,
   type PluginOptionsInput,
 } from "../src/config.js"
 
 const projectRoot = "/tmp/plugin-root"
 
-test("parseOptions supplies the built-in OpenCode model and project image directory", () => {
-  const options = parseOptions({}, projectRoot)
+test("parseOptions requires an explicit vision provider", () => {
+  assert.throws(
+    () => parseOptions({}, projectRoot),
+    /vision must be configured/,
+  )
+})
 
-  assert.equal(options.vision.type, "opencode")
-  assert.equal(options.vision.model, DEFAULT_MODEL)
+test("parseOptions accepts an explicit OpenCode provider model", () => {
+  const options = parseOptions(
+    { vision: { model: "provider/vision-model" } },
+    projectRoot,
+  )
+
+  assert.deepEqual(options.vision, {
+    type: "opencode",
+    model: "provider/vision-model",
+  })
   assert.equal(options.saveDir, path.resolve(projectRoot, "images"))
 })
 

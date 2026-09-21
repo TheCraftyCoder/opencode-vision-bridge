@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.1.0 - 2026-09-21
+
+- Prevented failed automatic vision requests from aborting the parent OpenCode session. The bridge now preserves the attachment reference and reports that visual analysis was unavailable.
+- Removed the broken free-model default. A vision provider is now an explicit, authenticated configuration requirement.
+
 ## 1.0.4 - 2026-09-21
 
 - Added npm repository metadata, issue tracker, homepage, discovery keywords, and upstream-fork attribution.

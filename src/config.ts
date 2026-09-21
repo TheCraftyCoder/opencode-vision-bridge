@@ -1,6 +1,5 @@
 import path from "node:path"
 
-export const DEFAULT_MODEL = "opencode/mimo-v2.5-free"
 export const DEFAULT_TIMEOUT_MS = 180_000
 
 export interface OpenCodeVisionOptions {
@@ -53,6 +52,12 @@ export function parseOptions(
 }
 
 function parseVision(input: PluginOptionsInput["vision"]): VisionOptions {
+  if (input === undefined) {
+    throw new TypeError(
+      "vision must be configured with an authenticated vision-capable provider model or OpenAI-compatible endpoint",
+    )
+  }
+
   if (input?.type === "openai-compatible") {
     return {
       type: input.type,
@@ -64,7 +69,7 @@ function parseVision(input: PluginOptionsInput["vision"]): VisionOptions {
 
   return {
     type: "opencode",
-    model: optionalString(input?.model, "vision.model") ?? DEFAULT_MODEL,
+    model: requiredString(input.model, "vision.model"),
   }
 }
 

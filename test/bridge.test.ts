@@ -87,3 +87,25 @@ test("the same image is described once across repeated context-hook calls", asyn
 
   assert.equal(calls, 1)
 })
+
+test("a vision-provider failure is represented honestly without aborting the parent session", async () => {
+  const bridge = new VisionBridge({
+    saveDir: await mkdtemp(path.join(tmpdir(), "vision-bridge-unavailable-")),
+    describe: async () => {
+      throw new Error("OpenCode's free tier can only be used from within OpenCode")
+    },
+  })
+  const input = messages()
+
+  await bridge.transform({ modelSupportsVision: false, messages: input })
+
+  const replacement = input[0]?.content[1]
+  assert.equal(replacement?.type, "text")
+  const replacementText =
+    replacement?.type === "text" && typeof replacement.text === "string"
+      ? replacement.text
+      : ""
+  assert.match(replacementText, /Image analysis was unavailable/)
+  assert.match(replacementText, /free tier can only be used from within OpenCode/)
+  assert.match(replacementText, /file:\/\//)
+})
