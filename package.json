@@ -1,6 +1,6 @@
 {
-  "name": "@thecraftycoder/opencode-vision-bridge",
-  "version": "1.0.2",
+  "name": "@the-crafty-coder/opencode-vision-bridge",
+  "version": "1.0.3",
   "description": "Automatic vision fallback for text-only OpenCode V2 sessions.",
   "private": false,
   "files": [

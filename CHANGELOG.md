@@ -1,8 +1,8 @@
 # Changelog
 
-## 1.0.2 - 2026-09-21
+## 1.0.3 - 2026-09-21
 
-- Published the stable V2 plugin under the public `@thecraftycoder/opencode-vision-bridge` npm scope.
+- Published the stable V2 plugin under the public `@the-crafty-coder/opencode-vision-bridge` npm scope.
 
 ## 1.0.1 - 2026-09-21
 

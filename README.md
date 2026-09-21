@@ -39,16 +39,16 @@ npm install
 Install the published package, then configure it in the V2 `plugins` field:
 
 ```bash
-opencode plugin add @thecraftycoder/opencode-vision-bridge@1.0.2
+opencode plugin add @the-crafty-coder/opencode-vision-bridge@1.0.3
 ```
 
-The equivalent Git release is `github:TheCraftyCoder/opencode-vision-bridge#v1.0.2`.
+The equivalent Git release is `github:TheCraftyCoder/opencode-vision-bridge#v1.0.3`.
 
 ```jsonc
 {
   "plugins": [
     {
-      "package": "@thecraftycoder/opencode-vision-bridge@1.0.2",
+      "package": "@the-crafty-coder/opencode-vision-bridge@1.0.3",
       "options": {
         "vision": {
           "type": "opencode",
