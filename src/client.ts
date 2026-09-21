@@ -1,5 +1,5 @@
-import { OpenCode } from "@opencode-ai/client"
-import { Service } from "@opencode-ai/client/service"
+import { OpenCode } from "@opencode/client"
+import { Service } from "@opencode/client/service"
 
 import type { VisionClient } from "./opencode-runner.js"
 
@@ -41,7 +41,9 @@ async function connect(version: string): Promise<VisionClient> {
           },
         }),
       generate: (input, options) => client.session.generate(input, options),
-      interrupt: (input) => client.session.interrupt(input),
+      interrupt: async (input) => {
+        await client.session.interrupt(input)
+      },
       remove: (input) => client.session.remove(input),
     },
   }

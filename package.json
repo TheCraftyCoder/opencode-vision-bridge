@@ -1,7 +1,8 @@
 {
   "name": "opencode-vision-bridge",
-  "version": "0.1.0",
-  "private": true,
+  "version": "1.0.0",
+  "description": "Automatic vision fallback for text-only OpenCode V2 sessions.",
+  "private": false,
   "type": "module",
   "exports": "./src/index.ts",
   "scripts": {
@@ -10,9 +11,9 @@
     "check": "npm run typecheck && npm test"
   },
   "dependencies": {
-    "@opencode-ai/ai": "0.0.0-next-16977",
-    "@opencode-ai/client": "0.0.0-next-16977",
-    "@opencode-ai/plugin": "0.0.0-next-16977"
+    "@opencode/ai": "2.0.12",
+    "@opencode/client": "2.0.12",
+    "@opencode/plugin": "2.0.12"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

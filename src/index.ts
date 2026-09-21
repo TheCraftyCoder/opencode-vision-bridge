@@ -1,6 +1,6 @@
 import { fileURLToPath } from "node:url"
 
-import { Plugin } from "@opencode-ai/plugin"
+import { Plugin } from "@opencode/plugin"
 
 import {
   VisionBridge,
@@ -29,11 +29,11 @@ export default Plugin.define({
   setup: async (ctx) => {
     const options = parseOptions(ctx.options as PluginOptionsInput, PROJECT_ROOT)
     const visionModel = await configureVisionCatalog(ctx, options)
-    const { location } = await ctx.catalog.model.list()
+    const location = ctx.location
     // Setup runs inside OpenCode's batched catalog boot. Read model data only
     // when a request arrives so catalog.updated has committed the generation.
     const capabilities = new ModelCapabilities(async () => {
-      const current = await ctx.catalog.model.list()
+      const current = await ctx.model.list()
       return current.data
     })
     const requests = new VisionRequestRegistry()

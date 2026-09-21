@@ -1,4 +1,4 @@
-import { Agent, Model, Provider, type Plugin } from "@opencode-ai/plugin"
+import { Agent, Model, Provider, type Plugin } from "@opencode/plugin"
 
 import type { PluginOptions } from "./config.js"
 
@@ -6,7 +6,7 @@ export const CUSTOM_PROVIDER_ID = "moeblack-vision-bridge-custom"
 export const INTERNAL_AGENT_ID = "moeblack.vision-bridge.internal"
 
 const CUSTOM_PROVIDER_PACKAGE =
-  "@opencode-ai/ai/providers/openai-compatible"
+  "@opencode/ai/providers/openai-compatible"
 const CUSTOM_CONTEXT_LIMIT = 128_000
 const CUSTOM_OUTPUT_LIMIT = 16_384
 
@@ -49,9 +49,8 @@ async function addCustomModel(
   const providerID = Provider.ID.make(CUSTOM_PROVIDER_ID)
   const modelID = Model.ID.make(options.model)
 
-  await ctx.catalog.transform((catalog) => {
-    catalog.provider.update(providerID, (provider) => {
-      Object.assign(provider, Provider.Info.empty(providerID), {
+  await ctx.provider.transform((providers) => {
+    const provider = Object.assign(Provider.Info.empty(providerID), {
         name: "Vision Bridge custom endpoint",
         package: CUSTOM_PROVIDER_PACKAGE,
         settings: {
@@ -59,9 +58,7 @@ async function addCustomModel(
           apiKey: options.apiKey,
         },
       })
-    })
-    catalog.model.update(providerID, modelID, (model) => {
-      Object.assign(model, Model.Info.default(providerID, modelID), {
+    const model = Object.assign(Model.Info.default(providerID, modelID), {
         modelID,
         name: `Vision Bridge: ${options.model}`,
         package: CUSTOM_PROVIDER_PACKAGE,
@@ -75,7 +72,7 @@ async function addCustomModel(
           output: CUSTOM_OUTPUT_LIMIT,
         },
       })
-    })
+    providers.add({ info: provider, models: [model] })
   })
 
   return { providerID, id: modelID }

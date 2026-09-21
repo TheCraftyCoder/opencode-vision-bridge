@@ -2,7 +2,7 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-An automatic image-viewing plugin for **OpenCode 2.0 beta**. When the current session model does not support image input, the plugin automatically:
+An automatic image-viewing plugin for **OpenCode 2.0.12+**. When the current session model does not support image input, the plugin automatically:
 
 1. Extracts images from the messages in `ctx.session.hook("context")` before the provider request is sent;
 2. Saves each image to disk under its SHA-256 filename;
@@ -23,9 +23,9 @@ The automatic attachment path needs no extra system prompt, tool call, or callin
 
 ## Requirements
 
-- OpenCode 2.0 beta: `@opencode-ai/cli@0.0.0-next-16977`
+- OpenCode 2.0.12 or newer
 - Node.js 22 or newer
-- Plugin dependencies are pinned to the same build as the target OpenCode beta (`0.0.0-next-16977`)
+- Plugin dependencies are pinned to the matching stable OpenCode 2.0.12 API packages.
 
 Install dependencies:
 
@@ -36,13 +36,17 @@ npm install
 
 ## Install into OpenCode
 
-Add a local entry to the V2 `plugins` config field. Absolute paths are supported by the V2 native plugin loader:
+Install the pinned release, then configure it in the V2 `plugins` field:
+
+```bash
+opencode plugin add github:TheCraftyCoder/opencode-vision-bridge#v1.0.0
+```
 
 ```jsonc
 {
   "plugins": [
     {
-      "package": "/path/to/opencode-vision-bridge/src/index.ts",
+      "package": "github:TheCraftyCoder/opencode-vision-bridge#v1.0.0",
       "options": {
         "vision": {
           "type": "opencode",
@@ -109,7 +113,7 @@ This mode reuses the provider, credentials, model settings and variant already l
 }
 ```
 
-The plugin registers an in-memory provider `moeblack-vision-bridge-custom` using the native `@opencode-ai/ai/providers/openai-compatible` package, then calls it through the same internal agent flow. This provider is never written back to the OpenCode config file.
+The plugin registers an in-memory provider `moeblack-vision-bridge-custom` using the native `@opencode/ai/providers/openai-compatible` package, then calls it through the same internal agent flow. This provider is never written back to the OpenCode config file.
 
 ## Explicit `read_image` tool
 
@@ -203,9 +207,8 @@ npm run check
 
 ## Beta limitations
 
-- The plugin API is still beta. After upgrading `opencode2`, sync the three `@opencode-ai/*` dependencies to the same build and re-run the load verification.
-- If the same config keeps the legacy `plugin: ["opencode-see-image"]` entry for V1, `next-16977` still tries to parse that V1 package with the V2 API and logs an `Expected object` compatibility warning; this does not affect `moeblack.vision-bridge` loading. Only removing the legacy field silences the warning, at the cost of losing the V1 plugin wiring.
-- The Promise `SessionDomain` of `@opencode-ai/plugin` does not expose the `remove` method needed to delete a session. The plugin uses the same-version `@opencode-ai/client` to discover and connect to the managed background service, so `opencode2 --standalone` is not supported yet.
+- OpenCode plugin APIs can change between releases. After upgrading OpenCode, align the three `@opencode/*` dependencies and rerun the load verification.
+- The plugin uses the same-version `@opencode/client` to discover and connect to the managed background service, so `opencode --standalone` is not supported yet.
 - V2 has no one-shot generate API that carries images without any session. The temporary session keeps no messages and is deleted when the call finishes; debugging clients that subscribe to the raw server event stream may still observe the corresponding create/delete events.
 - The `context` runtime hook currently has no progress metadata or TUI heartbeat channel. To avoid creating visible messages, no V1-style progress bar is shown while waiting for the vision call.
 - OpenCode V2 currently places only PNG, JPEG, GIF and WebP prompt attachments into the model context. This limits automatic interception; `read_image` can also read BMP and AVIF files directly from disk.

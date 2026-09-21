@@ -1,5 +1,6 @@
 import assert from "node:assert/strict"
 import test from "node:test"
+import path from "node:path"
 
 import {
   DEFAULT_MODEL,
@@ -14,7 +15,7 @@ test("parseOptions supplies the built-in OpenCode model and project image direct
 
   assert.equal(options.vision.type, "opencode")
   assert.equal(options.vision.model, DEFAULT_MODEL)
-  assert.equal(options.saveDir, "/tmp/plugin-root/images")
+  assert.equal(options.saveDir, path.resolve(projectRoot, "images"))
 })
 
 test("parseOptions accepts a custom OpenAI-compatible endpoint", () => {
@@ -25,7 +26,7 @@ test("parseOptions accepts a custom OpenAI-compatible endpoint", () => {
       baseURL: "https://vision.example/v1/",
       apiKey: "secret",
     },
-    saveDir: "/tmp/saved-images",
+    saveDir: path.resolve(projectRoot, "saved-images"),
     timeoutMs: 45_000,
   }
 
@@ -37,7 +38,7 @@ test("parseOptions accepts a custom OpenAI-compatible endpoint", () => {
     baseURL: "https://vision.example/v1",
     apiKey: "secret",
   })
-  assert.equal(options.saveDir, "/tmp/saved-images")
+  assert.equal(options.saveDir, path.resolve(projectRoot, "saved-images"))
   assert.equal(options.timeoutMs, 45_000)
 })
 
