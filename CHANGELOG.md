@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.2 - 2026-09-21
+
+- Published the stable V2 plugin under the public `@thecraftycoder/opencode-vision-bridge` npm scope.
+
 ## 1.0.1 - 2026-09-21
 
 - Inject transient vision media through both stable V2 `context` and `generate` hooks.
