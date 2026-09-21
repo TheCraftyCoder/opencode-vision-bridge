@@ -12,10 +12,12 @@ import {
   INTERNAL_AGENT_ID,
   VISION_SYSTEM_PROMPT,
 } from "./catalog.js"
-import { lazyLocalVisionClient } from "./client.js"
 import { parseOptions, type PluginOptionsInput } from "./config.js"
 import { ModelCapabilities } from "./model-capabilities.js"
-import { OpenCodeVisionRunner } from "./opencode-runner.js"
+import {
+  OpenCodeVisionRunner,
+  type VisionClient,
+} from "./opencode-runner.js"
 import { ReadImageTool, type ReadImageInput } from "./read-image.js"
 import {
   VisionRequestRegistry,
@@ -38,7 +40,7 @@ export default Plugin.define({
     })
     const requests = new VisionRequestRegistry()
     const runner = new OpenCodeVisionRunner({
-      client: lazyLocalVisionClient(ctx.app.version),
+      client: inProcessVisionClient(ctx),
       requests,
       agent: INTERNAL_AGENT_ID,
       model: visionModel,
@@ -144,3 +146,31 @@ export default Plugin.define({
     })
   },
 })
+
+function inProcessVisionClient(ctx: Parameters<typeof Plugin.define>[0]["setup"] extends (
+  context: infer Context,
+) => unknown ? Context : never): VisionClient {
+  return {
+    session: {
+      create: (input) =>
+        ctx.session.create({
+          ...input,
+          model: {
+            providerID: input.model.providerID,
+            id: input.model.id,
+            ...(input.model.variant === undefined
+              ? {}
+              : { variant: input.model.variant }),
+          },
+        }),
+      generate: (input, options) => ctx.session.generate(input, options),
+      interrupt: async (input) => {
+        await ctx.session.interrupt(input)
+      },
+      // The Promise plugin surface does not expose session removal. Keeping this
+      // empty transient session is preferable to re-entering the HTTP server
+      // from its own context hook, which interrupts the parent request in V2.
+      remove: async () => undefined,
+    },
+  }
+}
