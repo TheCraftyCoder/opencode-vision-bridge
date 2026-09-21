@@ -2,6 +2,8 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
+Forked from [Moeblack/opencode-vision-bridge](https://github.com/Moeblack/opencode-vision-bridge) and ported for stable OpenCode V2.
+
 An automatic image-viewing plugin for **OpenCode 2.0.12+**. When the current session model does not support image input, the plugin automatically:
 
 1. Extracts images from the messages in `ctx.session.hook("context")` before the provider request is sent;
@@ -39,16 +41,16 @@ npm install
 Install the published package, then configure it in the V2 `plugins` field:
 
 ```bash
-opencode plugin add @the-crafty-coder/opencode-vision-bridge@1.0.3
+opencode plugin add @the-crafty-coder/opencode-vision-bridge@1.0.4
 ```
 
-The equivalent Git release is `github:TheCraftyCoder/opencode-vision-bridge#v1.0.3`.
+The equivalent Git release is `github:TheCraftyCoder/opencode-vision-bridge#v1.0.4`.
 
 ```jsonc
 {
   "plugins": [
     {
-      "package": "@the-crafty-coder/opencode-vision-bridge@1.0.3",
+      "package": "@the-crafty-coder/opencode-vision-bridge@1.0.4",
       "options": {
         "vision": {
           "type": "opencode",

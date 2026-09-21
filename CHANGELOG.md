@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.4 - 2026-09-21
+
+- Added npm repository metadata, issue tracker, homepage, discovery keywords, and upstream-fork attribution.
+
 ## 1.0.3 - 2026-09-21
 
 - Published the stable V2 plugin under the public `@the-crafty-coder/opencode-vision-bridge` npm scope.

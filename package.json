@@ -1,7 +1,23 @@
 {
   "name": "@the-crafty-coder/opencode-vision-bridge",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Automatic vision fallback for text-only OpenCode V2 sessions.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/TheCraftyCoder/opencode-vision-bridge.git"
+  },
+  "homepage": "https://github.com/TheCraftyCoder/opencode-vision-bridge#readme",
+  "bugs": {
+    "url": "https://github.com/TheCraftyCoder/opencode-vision-bridge/issues"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "vision",
+    "multimodal",
+    "zai",
+    "glm"
+  ],
   "private": false,
   "files": [
     "src",
