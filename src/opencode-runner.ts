@@ -67,13 +67,16 @@ export class OpenCodeVisionRunner {
     this.#timeoutMs = options.timeoutMs
   }
 
-  async describe(request: VisionDescriptionRequest): Promise<string> {
+  async describe(
+    request: VisionDescriptionRequest,
+    directory = this.#directory,
+  ): Promise<string> {
     const client = await this.#resolveClient()
     const session = await client.session.create({
       title: TRANSIENT_SESSION_TITLE,
       agent: this.#agent,
       model: this.#model,
-      location: { directory: this.#directory },
+      location: { directory },
     })
     const sessionRequest = { sessionID: session.id }
     const signal = AbortSignal.timeout(this.#timeoutMs)

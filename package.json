@@ -1,6 +1,6 @@
 {
   "name": "opencode-vision-bridge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Automatic vision fallback for text-only OpenCode V2 sessions.",
   "private": false,
   "type": "module",

@@ -45,10 +45,17 @@ export default Plugin.define({
       directory: location.directory,
       timeoutMs: options.timeoutMs,
     })
-    const bridge = new VisionBridge({
-      saveDir: options.saveDir,
-      describe: (request) => runner.describe(request),
-    })
+    const bridges = new Map<string, VisionBridge>()
+    const bridgeFor = (directory: string): VisionBridge => {
+      const existing = bridges.get(directory)
+      if (existing) return existing
+      const bridge = new VisionBridge({
+        saveDir: options.saveDir,
+        describe: (request) => runner.describe(request, directory),
+      })
+      bridges.set(directory, bridge)
+      return bridge
+    }
     const readImage = new ReadImageTool({
       projectDirectory: location.directory,
       saveDir: options.saveDir,
@@ -98,7 +105,13 @@ export default Plugin.define({
       })
     })
 
-    await ctx.session.hook("context", async (event) => {
+    const prepareInternalVisionRequest = (event: {
+      readonly agent: string
+      readonly sessionID: string
+      system: Array<{ type: "text"; text: string }>
+      tools: Record<string, unknown>
+      messages: unknown[]
+    }): boolean => {
       if (event.agent === INTERNAL_AGENT_ID) {
         event.system.splice(0, event.system.length, {
           type: "text",
@@ -109,15 +122,25 @@ export default Plugin.define({
           event.sessionID,
           event.messages as unknown as RequestContextMessage[],
         )
-        return
+        return true
       }
+      return false
+    }
+
+    await ctx.session.hook("context", async (event) => {
+      if (prepareInternalVisionRequest(event)) return
 
       const messages = event.messages as unknown as BridgeMessage[]
       if (!hasImageParts(messages)) return
-      await bridge.transform({
+      const session = await ctx.session.get({ sessionID: event.sessionID })
+      await bridgeFor(session.location.directory).transform({
         modelSupportsVision: await capabilities.supportsVision(event.model),
         messages,
       })
+    })
+
+    await ctx.session.hook("generate", async (event) => {
+      prepareInternalVisionRequest(event)
     })
   },
 })

@@ -12,7 +12,7 @@ function fakeClient(log: string[]): VisionClient {
   return {
     session: {
       create: async (input) => {
-        log.push(`create:${input.title}`)
+        log.push(`create:${input.title}:${input.location.directory}`)
         return { id: "ses_test" }
       },
       generate: async (input) => {
@@ -49,7 +49,7 @@ test("runner uses a named transient session and deletes it after extracting text
 
   assert.equal(text, "vision result")
   assert.deepEqual(log, [
-    `create:${TRANSIENT_SESSION_TITLE}`,
+    `create:${TRANSIENT_SESSION_TITLE}:${process.cwd()}`,
     "generate:true",
     "remove",
   ])
@@ -81,7 +81,7 @@ test("runner interrupts and removes the transient session when generation fails"
   )
 
   assert.deepEqual(log, [
-    `create:${TRANSIENT_SESSION_TITLE}`,
+    `create:${TRANSIENT_SESSION_TITLE}:${process.cwd()}`,
     "generate:false",
     "interrupt",
     "remove",

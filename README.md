@@ -39,14 +39,14 @@ npm install
 Install the pinned release, then configure it in the V2 `plugins` field:
 
 ```bash
-opencode plugin add github:TheCraftyCoder/opencode-vision-bridge#v1.0.0
+opencode plugin add github:TheCraftyCoder/opencode-vision-bridge#v1.0.1
 ```
 
 ```jsonc
 {
   "plugins": [
     {
-      "package": "github:TheCraftyCoder/opencode-vision-bridge#v1.0.0",
+      "package": "github:TheCraftyCoder/opencode-vision-bridge#v1.0.1",
       "options": {
         "vision": {
           "type": "opencode",

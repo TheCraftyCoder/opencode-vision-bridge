@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 - 2026-09-21
+
+- Inject transient vision media through both stable V2 `context` and `generate` hooks.
+- Create transient vision sessions in the originating session's project location so provider configuration is retained.
+
 ## 1.0.0 - 2026-09-21
 
 - Ported the vision bridge from the OpenCode V2 beta API to stable OpenCode 2.0.12.
