@@ -1,9 +1,10 @@
 import { homedir } from "node:os"
+import { realpath } from "node:fs/promises"
 import path from "node:path"
 
 import {
   DEFAULT_QUESTION,
-  visionDescriptionText,
+  attachmentDescriptionText,
   type VisionDescriptionRequest,
 } from "./bridge.js"
 import { imageFromFile, saveImage } from "./image.js"
@@ -34,26 +35,33 @@ export class ReadImageTool {
   }
 
   async execute(input: ReadImageInput): Promise<string> {
-    const sourcePath = resolveImagePath(
+    const sourcePath = await resolveImagePathSecure(
       input.filePath,
       this.#projectDirectory,
       this.#homeDirectory,
     )
     const image = await imageFromFile(sourcePath)
-    const saved = await saveImage(image, this.#saveDir)
+    if (!image.mediaType.startsWith("image/")) {
+      throw new TypeError(`read_image only accepts image files: ${sourcePath}`)
+    }
+    await saveImage(image, this.#saveDir)
     const description = (
       await this.#describe({
         dataUrl: image.dataUrl,
         mediaType: image.mediaType,
         ...(image.filename === undefined ? {} : { filename: image.filename }),
-        fileUrl: saved.url,
         question: input.question ?? DEFAULT_QUESTION,
       })
     ).trim()
     if (description === "") {
       throw new Error("Vision model returned an empty description")
     }
-    return visionDescriptionText({ description, fileUrl: saved.url })
+    return attachmentDescriptionText({
+      description,
+      mediaType: image.mediaType,
+      ...(image.filename === undefined ? {} : { filename: image.filename }),
+      cacheable: true,
+    })
   }
 }
 
@@ -62,8 +70,45 @@ export function resolveImagePath(
   projectDirectory: string,
   homeDirectory = homedir(),
 ): string {
-  if (filePath.startsWith("~/")) {
+  if (filePath === "~" || filePath.startsWith("~/") || filePath.startsWith("~\\")) {
     return path.resolve(homeDirectory, filePath.slice(2))
   }
   return path.resolve(projectDirectory, filePath)
+}
+
+/**
+ * Resolve a read_image path under the project root and reject symlink escapes.
+ * Home-relative paths and absolute paths outside the project are deliberately
+ * rejected by default: the tool is intended to inspect project assets, not
+ * arbitrary files from the host. Absolute paths inside the project are fine.
+ */
+async function resolveImagePathSecure(
+  filePath: string,
+  projectDirectory: string,
+  homeDirectory: string,
+): Promise<string> {
+  if (filePath === "~" || filePath.startsWith("~/") || filePath.startsWith("~\\")) {
+    throw new TypeError("read_image only accepts paths inside the project directory; ~/ paths are not allowed")
+  }
+
+  const projectPath = path.resolve(projectDirectory)
+  const candidate = resolveImagePath(filePath, projectPath, homeDirectory)
+  if (!isWithin(projectPath, candidate)) {
+    throw new TypeError("read_image only accepts paths inside the project directory")
+  }
+
+  const [projectRealPath, candidateRealPath] = await Promise.all([
+    realpath(projectPath),
+    realpath(candidate),
+  ])
+  if (!isWithin(projectRealPath, candidateRealPath)) {
+    throw new TypeError("read_image rejected a path that escapes the project directory")
+  }
+  return candidateRealPath
+}
+
+function isWithin(parent: string, candidate: string): boolean {
+  const relative = path.relative(path.resolve(parent), path.resolve(candidate))
+  return relative === "" ||
+    (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative))
 }

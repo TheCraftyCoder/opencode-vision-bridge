@@ -1,7 +1,7 @@
 {
   "name": "@the-crafty-coder/opencode-vision-bridge",
-  "version": "1.1.0",
-  "description": "Automatic vision fallback for text-only OpenCode V2 sessions.",
+  "version": "1.2.0",
+  "description": "Automatic image and PDF fallback for text-only OpenCode V2 sessions.",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/TheCraftyCoder/opencode-vision-bridge.git"
@@ -19,7 +19,11 @@
     "glm"
   ],
   "private": false,
+  "engines": {
+    "node": ">=22.13.0"
+  },
   "files": [
+    "index.ts",
     "src",
     "README.md",
     "README.ja.md",
@@ -30,16 +34,18 @@
     "access": "public"
   },
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": "./index.ts",
   "scripts": {
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm test"
   },
   "dependencies": {
+    "@napi-rs/canvas": "1.0.9",
     "@opencode/ai": "2.0.12",
     "@opencode/client": "2.0.12",
-    "@opencode/plugin": "2.0.12"
+    "@opencode/plugin": "2.0.12",
+    "pdfjs-dist": "6.3.289"
   },
   "devDependencies": {
     "@types/node": "^24.3.0",

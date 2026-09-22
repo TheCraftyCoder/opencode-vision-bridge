@@ -2,114 +2,110 @@
 
 [English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md)
 
-Forked from [Moeblack/opencode-vision-bridge](https://github.com/Moeblack/opencode-vision-bridge) and ported for stable OpenCode V2.
+Automatic image and PDF understanding for text-only **OpenCode v2** sessions.
 
-An automatic image-viewing plugin for **OpenCode 2.0.12+**. When the current session model does not support image input, the plugin automatically:
+Use a text-only model such as `zai-coding-plan/glm-5.3` as the main session model. When you paste an image or PDF, the plugin sends only that attachment and your question to `zai-coding-plan/glm-5.3-flash`, then gives the resulting description back to the main model as text.
 
-1. Extracts images from the messages in `ctx.session.hook("context")` before the provider request is sent;
-2. Saves each image to disk under its SHA-256 filename;
-3. Sends the image to a configured vision-capable model through the OpenCode agent path to generate a text description;
-4. Replaces the original image part with the description text, including a local `file:` URL;
-5. Lets the non-vision main model continue processing the request normally.
+GLM-5.3-Flash is the default. You can override it with any multimodal model already configured in OpenCode or with an OpenAI-compatible endpoint.
 
-The automatic attachment path needs no extra system prompt, tool call, or calling convention. When the current model natively supports `image` input, the plugin leaves the messages untouched and the image goes straight to that model.
+## What it does
 
-## Features
-
-- **Zero-intrusion automatic path**: attachment interception does not depend on the main model making a tool call.
-- **No side effects**: the vision request runs through a hidden internal agent on a temporary session; no persistent session is created, no user/assistant message is admitted, no automatic session rename is triggered.
-- **Image saved to disk**: every bridged image (including clipboard pastes) is stored under its SHA-256 name and referenced by a `file:///...` URL in the injected description.
-- **Configurable vision source**: use an OpenCode provider model already in your catalog, or any custom OpenAI-compatible endpoint (baseURL + apiKey).
-- **Vision-aware**: models that natively accept images are never intercepted.
-- **Explicit disk-image reading**: the `read_image` tool lets the model inspect an image that already exists on disk.
+- Images: the v2 `context` hook checks the active model. Text-only models receive a GLM-5.3-Flash description; models with native image input receive the original image unchanged.
+- PDFs: the v2 `prompt` hook intercepts the file before OpenCode's attachment resolver can omit it, asks GLM-5.3-Flash to describe it, removes the binary attachment, and appends the description to the admitted prompt.
+- Each bridged attachment is saved under a SHA-256 filename in the project's `.opencode/vision-bridge/attachments/` directory. Local paths are not sent to either model.
+- Vision failures are represented by an explicit unavailable-analysis note. The plugin does not invent attachment contents or abort the main text-only request.
+- A complementary `read_image` tool lets the model inspect an image already on disk.
 
 ## Requirements
 
 - OpenCode 2.0.12 or newer
-- Node.js 22 or newer
-- Plugin dependencies are pinned to the matching stable OpenCode 2.0.12 API packages.
+- Node.js 22.13 or newer
+- Access to `zai-coding-plan/glm-5.3-flash`, or another configured multimodal model
 
-Install dependencies:
+The OpenCode API dependencies are pinned together at `2.0.12`.
 
-```bash
-cd opencode-vision-bridge
-npm install
-```
-
-## Install into OpenCode
-
-Install the published package, then configure it in the V2 `plugins` field:
+## Install
 
 ```bash
-opencode plugin add @the-crafty-coder/opencode-vision-bridge@1.1.0
+opencode plugin add @the-crafty-coder/opencode-vision-bridge@1.2.0
 ```
 
-The equivalent Git release is `github:TheCraftyCoder/opencode-vision-bridge#v1.1.0`.
+The equivalent Git release is `github:TheCraftyCoder/opencode-vision-bridge#v1.2.0`.
+
+Add the plugin to `opencode.jsonc`. No options are required for the default GLM-5.3-Flash setup:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "zai-coding-plan/glm-5.3",
+  "plugins": ["@the-crafty-coder/opencode-vision-bridge@1.2.0"]
+}
+```
+
+Plugin ID: `moeblack.vision-bridge`.
+
+Restart OpenCode after installing or changing the package:
+
+```bash
+opencode service restart
+```
+
+## Configuration
+
+Object form is only needed when overriding defaults:
 
 ```jsonc
 {
   "plugins": [
     {
-      "package": "@the-crafty-coder/opencode-vision-bridge@1.1.0",
+      "package": "@the-crafty-coder/opencode-vision-bridge@1.2.0",
       "options": {
         "vision": {
           "type": "opencode",
-          "model": "your-provider/vision-model"
-        }
+          "model": "zai-coding-plan/glm-5.3-flash"
+        },
+        "saveDir": "./images",
+        "timeoutMs": 180000
       }
     }
   ]
 }
 ```
 
-Plugin ID:
-
-```text
-moeblack.vision-bridge
-```
-
-If the same config file is also used by OpenCode V1, keep the V1 `plugin` field and add the V2 `plugins` field alongside it. V1 plugin implementations do not run in V2.
-
-## Configuration
-
 | Option | Type | Default | Description |
 | --- | --- | --- | --- |
-| `vision.type` | `"opencode" \| "openai-compatible"` | `"opencode"` | Vision model source. |
-| `vision.model` | `string` | required | `provider/model[#variant]` for built-in sources; upstream model ID for custom sources. |
-| `vision.baseURL` | `string` | none | Base URL of a custom OpenAI-compatible endpoint. |
-| `vision.apiKey` | `string` | none | Bearer key for the custom OpenAI-compatible endpoint. |
-| `saveDir` | `string` | `images/` in the project | Directory where images are saved. Relative paths resolve against the plugin project root. |
-| `timeoutMs` | positive integer | `180000` | Timeout for one vision generation, in milliseconds. |
+| `vision.type` | `"opencode" \| "openai-compatible"` | `"opencode"` | Where the multimodal model comes from. |
+| `vision.model` | `string` | `"zai-coding-plan/glm-5.3-flash"` | `provider/model[#variant]` for an OpenCode model; upstream model ID for a custom endpoint. |
+| `vision.baseURL` | `string` | none | Base URL for an OpenAI-compatible endpoint. |
+| `vision.apiKey` | `string` | none | Bearer key for an OpenAI-compatible endpoint. |
+| `saveDir` | `string` | `.opencode/vision-bridge/attachments/` in the session project | Where bridged attachments are saved. Relative paths resolve from the session project. |
+| `timeoutMs` | positive integer | `180000` | Timeout for one multimodal generation and the complete rendering of one PDF. |
 
-### Using an existing OpenCode provider
-
-`vision.model` must be a model present in the current OpenCode catalog whose `capabilities.input` includes `image`:
+To reuse another OpenCode model:
 
 ```jsonc
 {
-  "package": "/path/to/opencode-vision-bridge/src/index.ts",
+  "package": "@the-crafty-coder/opencode-vision-bridge@1.2.0",
   "options": {
     "vision": {
       "type": "opencode",
-      "model": "your-provider/vision-model"
-    },
-    "saveDir": "/path/to/opencode-vision-bridge/images",
-    "timeoutMs": 180000
+      "model": "provider/vision-model"
+    }
   }
 }
 ```
 
-This mode reuses the provider, credentials, model settings and variant already loaded by OpenCode.
+The selected model must accept image input. PDF pages are rendered to PNG before they are sent, so the upstream model does not need native PDF input.
 
-### Using a custom OpenAI-compatible endpoint
+To use a custom OpenAI-compatible endpoint:
 
 ```jsonc
 {
-  "package": "/path/to/opencode-vision-bridge/src/index.ts",
+  "package": "@the-crafty-coder/opencode-vision-bridge@1.2.0",
   "options": {
     "vision": {
       "type": "openai-compatible",
-      "model": "my-vision-model",
+      "model": "glm-5.3-flash",
       "baseURL": "https://vision.example.com/v1",
       "apiKey": "replace-with-key"
     }
@@ -117,33 +113,13 @@ This mode reuses the provider, credentials, model settings and variant already l
 }
 ```
 
-The plugin registers an in-memory provider `moeblack-vision-bridge-custom` using the native `@opencode/ai/providers/openai-compatible` package, then calls it through the same internal agent flow. This provider is never written back to the OpenCode config file.
+The custom provider is registered in memory and is not written back to OpenCode configuration.
 
-## Explicit `read_image` tool
+## How the v2 bridge works
 
-Automatic interception remains the default path for images attached to a message: the main model does not need to call any tool. `read_image` is a complementary explicit path for an image that already exists on disk, such as a generated screenshot, chart, or UI artifact that the model needs to inspect later.
+### Pasted images
 
-| Parameter | Type | Required | Description |
-| --- | --- | --- | --- |
-| `filePath` | `string` | yes | Absolute path, a path beginning with `~/`, or a path relative to the current project directory. |
-| `question` | `string` | no | A focused question for the vision model. When omitted, the plugin requests a general detailed description that preserves visible text and layout. |
-
-For example, ask the model to use `read_image` with:
-
-```json
-{
-  "filePath": "artifacts/ui-error.png",
-  "question": "What error is shown in the terminal, and which source line caused it?"
-}
-```
-
-The tool reads the file, saves the same bytes in `saveDir` under their SHA-256 name, routes them through the configured vision model, and returns both the saved `file:///...` URL and the textual description. It recognizes PNG, JPEG (`.jpg` and `.jpeg`), GIF, WebP, BMP, and AVIF extensions case-insensitively; an unknown extension is sent as `image/png`.
-
-## How it works
-
-### Main-request interception
-
-The V2 model context normalizes images as:
+OpenCode v2 normalizes supported images into model-context media parts:
 
 ```ts
 {
@@ -153,68 +129,63 @@ The V2 model context normalizes images as:
 }
 ```
 
-The plugin also recognizes V1-style data-URL `file` parts to stay resilient while the beta message shape changes. Model capability is read from the V2 model catalog; when `capabilities.input` includes `image`, the plugin returns immediately without saving or describing anything.
+Immediately before a model call, the plugin reads the active model's current catalog capabilities. If it includes `image`, the media part is left unchanged. Otherwise the plugin replaces it in place with a text block containing the GLM-5.3-Flash description.
 
-### Side-effect-free vision generation
+### Pasted PDFs
 
-The V2 global `/api/generate` endpoint does not accept attachments, and a session agent loop may execute tools. The plugin therefore:
+PDFs need an earlier path because current OpenCode v2 attachment resolution does not reliably place PDF prompt attachments into model context. The plugin handles them in `ctx.session.hook("prompt")`:
 
-1. Creates an empty temporary session with a fixed non-default title, targeting a hidden internal agent with the vision model;
-2. Keeps the image only in an in-memory request table;
-3. Calls `session.generate` for a one-shot generation;
-4. Injects the image inside that generation's `context` hook and clears the tools;
-5. Reads the text returned directly by `session.generate`;
-6. Deletes the temporary session in a `finally` block.
+1. Read a pasted `data:` URL or attached local `file:` URL.
+2. Validate the file size, save the PDF using its SHA-256 digest, and render at most 32 pages to bounded PNG batches of eight.
+3. Ask GLM-5.3-Flash to inspect the page images using the surrounding user text as the question.
+4. Remove the original binary PDF attachment while preserving existing prompt text and mention offsets.
+5. Append a bounded `[Attached PDF] ... [/Attached PDF]` text description to the same user prompt.
 
-No prompt is admitted to the temporary session, no user/assistant message is written, and automatic title-generation conditions are never met. The internal agent does not enter a multi-step agent loop and cannot execute file, shell or network tools.
+Other prompt files, including text files and pasted images, remain on OpenCode's normal resolution path.
 
-## Verification
+### Internal generation
 
-### 1. Static checks and tests
+The bridge registers a hidden, one-step internal agent with all tools denied. One reusable internal session per project handles serialized `session.generate` calls. An idempotent in-memory request registry supplies the attachment without admitting user or assistant messages. This prevents tool execution, duplicate media injection, unbounded session creation, and automatic title generation during visual analysis.
 
-```bash
-cd opencode-vision-bridge
-npm run check
-```
+## Explicit `read_image` tool
 
-### 2. Confirm the plugin is loaded
+`read_image` handles PNG, JPEG, GIF, WebP, BMP, and AVIF files already inside the current project. It rejects unknown extensions, oversized files, traversal, home-relative paths, and symlinks that escape the project. It accepts:
 
-After changing the config, restart the background service:
+| Parameter | Type | Required | Description |
+| --- | --- | --- | --- |
+| `filePath` | `string` | yes | Path relative to the project, or an absolute path that remains inside it. |
+| `question` | `string` | no | A focused visual question. Omit it for a general description. |
 
-```bash
-opencode2 service restart
-opencode2 api get /api/plugin
-```
-
-The returned `data` should contain:
+Example input:
 
 ```json
-{"id":"moeblack.vision-bridge"}
+{
+  "filePath": "artifacts/ui-error.png",
+  "question": "What error is shown, and which source line caused it?"
+}
 ```
 
-### 3. Functional check
+## Verify
 
-1. Pick a model that only supports `text` input;
-2. Paste a PNG, JPEG, GIF or WebP image;
-3. Ask directly about the image content;
-4. Confirm the answer uses the image information;
-5. Confirm a new `<sha256>.<ext>` file appears in `saveDir`;
-6. Then pick a native vision model, paste an image, and confirm the request still completes and the bridge adds no new image file.
-
-## Development commands
+Run the static checks and unit tests:
 
 ```bash
-npm test
-npm run typecheck
+npm install
 npm run check
 ```
 
-## Requirements and constraints
+Then verify in OpenCode:
 
-- OpenCode plugin APIs can change between releases. After upgrading OpenCode, align the three `@opencode/*` dependencies and rerun the load verification.
-- The bridge requires an explicitly configured, authenticated vision-capable provider model or OpenAI-compatible endpoint. OpenCode's `opencode/*-free` models currently reject the bridge's internal transient-session requests and must not be configured as its vision source. If a configured provider later becomes unavailable, the automatic bridge preserves the parent session and injects an explicit unavailable-analysis note; it never invents visual content.
-- The plugin uses the same-version `@opencode/client` to discover and connect to the managed background service, so `opencode --standalone` is not supported yet.
-- V2 has no one-shot generate API that carries images without any session. The temporary session keeps no messages and is deleted when the call finishes; debugging clients that subscribe to the raw server event stream may still observe the corresponding create/delete events.
-- The `context` runtime hook currently has no progress metadata or TUI heartbeat channel. To avoid creating visible messages, no V1-style progress bar is shown while waiting for the vision call.
-- OpenCode V2 currently places only PNG, JPEG, GIF and WebP prompt attachments into the model context. This limits automatic interception; `read_image` can also read BMP and AVIF files directly from disk.
-- The automatic bridge's description cache lives in plugin process memory; after a plugin reload or background-service restart the vision model is called again. Images already saved to disk are never deleted automatically.
+1. Select a text-only main model, such as `zai-coding-plan/glm-5.3`.
+2. Paste an image and ask about it. Confirm the answer uses visible details and a digest-named image appears in `saveDir`.
+3. Paste a PDF and ask for a summary. Confirm the answer uses document details and a digest-named `.pdf` appears in `saveDir`.
+4. Select a native image model, paste an image, and confirm the plugin does not create a new saved image.
+
+## Constraints
+
+- The default `zai-coding-plan/glm-5.3-flash` model must be available and authenticated in the OpenCode catalog. Override `vision.model` if you use a different provider.
+- Provider and model size/count limits still apply. The bridge additionally caps attachments at 25 MiB, PDFs at 32 rendered pages, rendered page images at 4 MiB, and PDFs at four per prompt.
+- Successful descriptions are cached in memory for 15 minutes with a 128-entry limit. Failures and partial PDF descriptions are never cached.
+- One empty hidden internal session may remain visible per project because the OpenCode Promise plugin surface does not expose safe session removal from inside a hook.
+- Saved digest files are not deleted automatically.
+- OpenCode plugin APIs can change between releases. Keep the three `@opencode/*` package versions aligned and rerun `npm run check` after upgrading.

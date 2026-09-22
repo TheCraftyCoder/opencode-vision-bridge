@@ -29,6 +29,13 @@ interface RequestOptions {
   readonly signal?: AbortSignal
 }
 
+interface SessionState {
+  readonly directory: string
+  client: VisionClient | undefined
+  sessionID: string | undefined
+  queue: Promise<void>
+}
+
 export interface VisionClient {
   readonly session: {
     create(input: CreateSessionInput): Promise<{ readonly id: string }>
@@ -37,7 +44,6 @@ export interface VisionClient {
       options?: RequestOptions,
     ): Promise<{ readonly text: string }>
     interrupt(input: SessionRequest): Promise<void>
-    remove(input: SessionRequest): Promise<void>
   }
 }
 
@@ -57,6 +63,7 @@ export class OpenCodeVisionRunner {
   readonly #model: ModelRef
   readonly #directory: string
   readonly #timeoutMs: number
+  readonly #sessions = new Map<string, SessionState>()
 
   constructor(options: OpenCodeVisionRunnerOptions) {
     this.#client = options.client
@@ -71,16 +78,45 @@ export class OpenCodeVisionRunner {
     request: VisionDescriptionRequest,
     directory = this.#directory,
   ): Promise<string> {
-    const client = await this.#resolveClient()
-    const session = await client.session.create({
-      title: TRANSIENT_SESSION_TITLE,
-      agent: this.#agent,
-      model: this.#model,
-      location: { directory },
-    })
-    const sessionRequest = { sessionID: session.id }
-    const signal = AbortSignal.timeout(this.#timeoutMs)
-    this.#requests.set(session.id, request)
+    const state = this.#sessionFor(directory)
+    // Keep the tail settled even when a request fails. This prevents one
+    // provider error from rejecting every later request in the same queue.
+    const result = state.queue.then(() => this.#describeOnSession(state, request))
+    state.queue = result.then(
+      () => undefined,
+      () => undefined,
+    )
+    return result
+  }
+
+  #sessionFor(directory: string): SessionState {
+    const existing = this.#sessions.get(directory)
+    if (existing) return existing
+
+    const state: SessionState = {
+      directory,
+      client: undefined,
+      sessionID: undefined,
+      queue: Promise.resolve(),
+    }
+    this.#sessions.set(directory, state)
+    return state
+  }
+
+  async #describeOnSession(
+    state: SessionState,
+    request: VisionDescriptionRequest,
+  ): Promise<string> {
+    const client = await this.#ensureSession(state)
+    const sessionID = state.sessionID
+    if (!sessionID) throw new Error("Vision session was not created")
+
+    const sessionRequest = { sessionID }
+    const timeoutSignal = AbortSignal.timeout(this.#timeoutMs)
+    const signal = request.signal
+      ? AbortSignal.any([timeoutSignal, request.signal])
+      : timeoutSignal
+    this.#requests.set(sessionID, request)
 
     try {
       const response = await client.session.generate(
@@ -94,12 +130,29 @@ export class OpenCodeVisionRunner {
       if (text === "") throw new Error("Vision generation returned no text")
       return text
     } catch (error) {
+      // Keep the reusable session after provider and timeout failures. Creating
+      // a replacement for every transient failure would leak sessions because
+      // the in-process plugin API cannot remove them safely from inside a hook.
       await client.session.interrupt(sessionRequest).catch(() => undefined)
       throw error
     } finally {
-      this.#requests.delete(session.id)
-      await client.session.remove(sessionRequest)
+      this.#requests.delete(sessionID)
     }
+  }
+
+  async #ensureSession(state: SessionState): Promise<VisionClient> {
+    if (state.client && state.sessionID) return state.client
+
+    const client = await this.#resolveClient()
+    const session = await client.session.create({
+      title: TRANSIENT_SESSION_TITLE,
+      agent: this.#agent,
+      model: this.#model,
+      location: { directory: state.directory },
+    })
+    state.client = client
+    state.sessionID = session.id
+    return client
   }
 
   async #resolveClient(): Promise<VisionClient> {
@@ -108,9 +161,14 @@ export class OpenCodeVisionRunner {
 }
 
 function visionPrompt(request: VisionDescriptionRequest): string {
+  const source = request.source
+  const attachmentType = source ? "PDF pages" : "image"
+  const pageContext = source
+    ? `This batch contains PDF pages ${source.pageStart}-${source.pageEnd} of ${source.pageCount}. Preserve page boundaries and page numbers in the response.`
+    : undefined
   return [
-    "Inspect the attached image and provide the visual evidence needed by another model.",
-    `Saved local reference: ${request.fileUrl}`,
+    `Inspect the attached ${attachmentType} and provide the evidence needed by another model.`,
+    ...(pageContext ? [pageContext] : []),
     "Question or surrounding user text:",
     request.question,
     "Return only an accurate, detailed textual description. Quote visible text exactly where relevant.",
