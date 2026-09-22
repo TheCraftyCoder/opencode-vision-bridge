@@ -1,6 +1,5 @@
 import assert from "node:assert/strict"
 import test from "node:test"
-import path from "node:path"
 
 import {
   DEFAULT_VISION_MODEL,
@@ -8,28 +7,26 @@ import {
   type PluginOptionsInput,
 } from "../src/config.js"
 
-const projectRoot = "/tmp/plugin-root"
-
 test("parseOptions defaults to GLM-5.3-Flash through OpenCode", () => {
-  const options = parseOptions({}, projectRoot)
+  const options = parseOptions({})
 
   assert.deepEqual(options.vision, {
     type: "opencode",
     model: DEFAULT_VISION_MODEL,
   })
+  assert.equal(options.saveDir, undefined)
 })
 
 test("parseOptions accepts an explicit OpenCode provider model", () => {
   const options = parseOptions(
     { vision: { model: "provider/vision-model" } },
-    projectRoot,
   )
 
   assert.deepEqual(options.vision, {
     type: "opencode",
     model: "provider/vision-model",
   })
-  assert.equal(options.saveDir, path.resolve(projectRoot, "images"))
+  assert.equal(options.saveDir, undefined)
 })
 
 test("parseOptions accepts a custom OpenAI-compatible endpoint", () => {
@@ -40,11 +37,11 @@ test("parseOptions accepts a custom OpenAI-compatible endpoint", () => {
       baseURL: "https://vision.example/v1/",
       apiKey: "secret",
     },
-    saveDir: path.resolve(projectRoot, "saved-images"),
+    saveDir: "saved-images",
     timeoutMs: 45_000,
   }
 
-  const options = parseOptions(input, projectRoot)
+  const options = parseOptions(input)
 
   assert.deepEqual(options.vision, {
     type: "openai-compatible",
@@ -52,7 +49,7 @@ test("parseOptions accepts a custom OpenAI-compatible endpoint", () => {
     baseURL: "https://vision.example/v1",
     apiKey: "secret",
   })
-  assert.equal(options.saveDir, path.resolve(projectRoot, "saved-images"))
+  assert.equal(options.saveDir, "saved-images")
   assert.equal(options.timeoutMs, 45_000)
 })
 
@@ -67,7 +64,6 @@ test("parseOptions rejects incomplete custom endpoint settings", () => {
             baseURL: "https://vision.example/v1",
           },
         },
-        projectRoot,
       ),
     /apiKey/,
   )

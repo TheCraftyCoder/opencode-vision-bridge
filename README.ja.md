@@ -10,7 +10,7 @@
 
 - 画像: v2 の `context` hook で現在のモデル能力を確認します。テキスト専用モデルには GLM-5.3-Flash の説明を渡し、画像入力対応モデルには元の画像をそのまま渡します。
 - PDF: OpenCode の添付処理で省略される前に v2 の `prompt` hook で処理し、バイナリ添付を説明文に置き換えます。
-- ブリッジした添付は SHA-256 名で `images/` に保存され、注入されるテキストにはローカル `file:` URL が含まれます。
+- ブリッジした添付はプロジェクトの `.opencode/vision-bridge/attachments/` に SHA-256 名で保存されます。ローカルパスはモデルへ送信しません。
 - vision 呼び出しが失敗した場合は、解析できなかったことを明示します。内容を推測せず、メインモデルのリクエストも中断しません。
 - `read_image` ツールでディスク上の既存画像を確認できます。
 
@@ -66,7 +66,7 @@ opencode plugin add @the-crafty-coder/opencode-vision-bridge@1.2.0
 | `vision.model` | `string` | `"zai-coding-plan/glm-5.3-flash"` | OpenCode では `provider/model[#variant]`、カスタムでは上流モデル ID。 |
 | `vision.baseURL` | `string` | なし | OpenAI 互換エンドポイントの URL。 |
 | `vision.apiKey` | `string` | なし | OpenAI 互換エンドポイントの bearer key。 |
-| `saveDir` | `string` | プラグイン内の `images/` | 添付ファイルの保存先。 |
+| `saveDir` | `string` | プロジェクト内 `.opencode/vision-bridge/attachments/` | 添付ファイルの保存先。相対パスはセッションのプロジェクト基準です。 |
 | `timeoutMs` | 正の整数 | `180000` | 1 回の生成タイムアウト（ミリ秒）。 |
 
 カスタム OpenAI 互換エンドポイント:
@@ -98,7 +98,9 @@ OpenCode でテキスト専用のメインモデルを選び、画像と PDF を
 
 - 既定モデルが OpenCode catalog で利用可能かつ認証済みである必要があります。別のモデルは `vision.model` で指定できます。
 - 上流モデルのファイルサイズ、個数、形式制限は引き続き適用されます。
-- 説明キャッシュはプロセス内のみです。再読み込みや再起動後は再解析され、保存済みファイルは自動削除されません。
-- OpenCode Promise プラグイン API は現在 session 削除を公開していません。内部生成はメッセージを書き込みませんが、OpenCode が整理するまで空の内部 session が見える場合があります。
+- 上流の制限に加え、添付は 25 MiB、PDF は最大 32 ページ、ページ PNG は 4 MiB、1 プロンプトは最大 4 PDF に制限されます。
+- 成功した説明は 15 分・最大 128 件キャッシュします。失敗や部分的な PDF 結果はキャッシュしません。
+- プロジェクトごとに空の非表示内部 session を 1 つ再利用します。OpenCode Promise API では hook 内から安全に削除できません。
+- 保存済みのダイジェストファイルは自動削除されません。
 
 実装詳細と `read_image` の引数は [English README](README.md) を参照してください。

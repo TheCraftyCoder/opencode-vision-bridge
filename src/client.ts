@@ -44,7 +44,6 @@ async function connect(version: string): Promise<VisionClient> {
       interrupt: async (input) => {
         await client.session.interrupt(input)
       },
-      remove: (input) => client.session.remove(input),
     },
   }
 }

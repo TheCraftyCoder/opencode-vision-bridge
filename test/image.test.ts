@@ -2,6 +2,7 @@ import assert from "node:assert/strict"
 import { mkdtemp, readFile, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { pathToFileURL } from "node:url"
 import test from "node:test"
 
 import {
@@ -10,6 +11,7 @@ import {
   imageFromFile,
   imageFromPart,
   saveImage,
+  MAX_ATTACHMENT_BYTES,
   type ImageLikePart,
 } from "../src/image.js"
 
@@ -79,6 +81,22 @@ test("attachmentFromUri reads pasted PDF data URLs", async () => {
   assert.deepEqual(attachment.bytes, bytes)
 })
 
+test("attachmentFromUri ignores unsupported disk extensions instead of guessing PNG", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "vision-bridge-file-uri-"))
+  const filePath = path.join(directory, ".env")
+  await writeFile(filePath, PNG_BYTES)
+
+  assert.equal(await attachmentFromUri(pathToFileURL(filePath).href), undefined)
+})
+
+test("data URLs are size-limited before Base64 allocation", () => {
+  const oversized = "A".repeat(Math.ceil((MAX_ATTACHMENT_BYTES + 1) / 3) * 4)
+  assert.throws(
+    () => attachmentFromPart({ type: "media", mediaType: "image/png", data: oversized }),
+    /exceeds the .*byte size limit/,
+  )
+})
+
 test("saveImage writes a deterministic digest-named file and returns its file URL", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "vision-bridge-image-"))
   const image = imageFromPart({
@@ -97,27 +115,49 @@ test("saveImage writes a deterministic digest-named file and returns its file UR
   assert.deepEqual(await readFile(first.path), PNG_BYTES)
 })
 
-test("imageFromFile maps supported extensions and defaults unknown extensions to PNG", async () => {
+test("imageFromFile maps only supported extensions and validates file signatures", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "vision-bridge-file-image-"))
   const expectedTypes = new Map([
-    ["image.png", "image/png"],
-    ["image.jpg", "image/jpeg"],
-    ["image.JPEG", "image/jpeg"],
-    ["image.gif", "image/gif"],
-    ["image.webp", "image/webp"],
-    ["image.bmp", "image/bmp"],
-    ["image.avif", "image/avif"],
-    ["image.unknown", "image/png"],
+    ["image.png", ["image/png", Buffer.from("89504e470d0a1a0a", "hex")]],
+    ["image.jpg", ["image/jpeg", Buffer.from("ffd8ff", "hex")]],
+    ["image.JPEG", ["image/jpeg", Buffer.from("ffd8ff", "hex")]],
+    ["image.gif", ["image/gif", Buffer.from("GIF89a")]],
+    ["image.webp", ["image/webp", Buffer.from("524946460000000057454250", "hex")]],
+    ["image.bmp", ["image/bmp", Buffer.from("BM")]],
+    ["image.avif", ["image/avif", Buffer.from("00000018667479706176696600000000", "hex")]],
   ])
 
   await Promise.all(
-    [...expectedTypes].map(async ([filename, mediaType]) => {
+    [...expectedTypes].map(async ([filename, expected]) => {
       const filePath = path.join(directory, filename)
-      await writeFile(filePath, PNG_BYTES)
+      const [mediaType, bytes] = expected as [string, Buffer]
+      await writeFile(filePath, bytes)
       const image = await imageFromFile(filePath)
       assert.equal(image.mediaType, mediaType)
       assert.equal(image.filename, filename)
-      assert.deepEqual(image.bytes, PNG_BYTES)
+      assert.deepEqual(image.bytes, bytes)
     }),
+  )
+
+  await writeFile(path.join(directory, "image.unknown"), PNG_BYTES)
+  await assert.rejects(
+    imageFromFile(path.join(directory, "image.unknown")),
+    /Unsupported attachment file extension/,
+  )
+  await writeFile(path.join(directory, ".env"), PNG_BYTES)
+  await assert.rejects(
+    imageFromFile(path.join(directory, ".env")),
+    /Unsupported attachment file extension/,
+  )
+})
+
+test("imageFromFile rejects an oversized disk attachment before reading it", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "vision-bridge-file-image-large-"))
+  const filePath = path.join(directory, "large.png")
+  await writeFile(filePath, Buffer.alloc(MAX_ATTACHMENT_BYTES + 1, 0))
+
+  await assert.rejects(
+    imageFromFile(filePath),
+    /exceeds the .*byte size limit/,
   )
 })

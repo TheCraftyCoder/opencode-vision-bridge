@@ -1,7 +1,6 @@
-import path from "node:path"
-
 export const DEFAULT_TIMEOUT_MS = 180_000
 export const DEFAULT_VISION_MODEL = "zai-coding-plan/glm-5.3-flash"
+export const DEFAULT_SAVE_DIR = ".opencode/vision-bridge/attachments"
 
 export interface OpenCodeVisionOptions {
   readonly type: "opencode"
@@ -37,17 +36,15 @@ export interface PluginOptionsInput {
 
 export interface PluginOptions {
   readonly vision: VisionOptions
-  readonly saveDir: string
+  readonly saveDir?: string
   readonly timeoutMs: number
 }
 
-export function parseOptions(
-  input: PluginOptionsInput,
-  projectRoot: string,
-): PluginOptions {
+export function parseOptions(input: PluginOptionsInput): PluginOptions {
+  const saveDir = optionalString(input.saveDir, "saveDir")
   return {
     vision: parseVision(input.vision),
-    saveDir: parseSaveDir(input.saveDir, projectRoot),
+    ...(saveDir === undefined ? {} : { saveDir }),
     timeoutMs: parseTimeout(input.timeoutMs),
   }
 }
@@ -70,11 +67,6 @@ function parseVision(input: PluginOptionsInput["vision"]): VisionOptions {
     type: "opencode",
     model: requiredString(input.model, "vision.model"),
   }
-}
-
-function parseSaveDir(input: string | undefined, projectRoot: string): string {
-  const configured = optionalString(input, "saveDir")
-  return path.resolve(projectRoot, configured ?? "images")
 }
 
 function parseTimeout(input: number | undefined): number {

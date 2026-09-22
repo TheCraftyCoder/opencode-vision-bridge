@@ -1,4 +1,4 @@
-import { fileURLToPath } from "node:url"
+import path from "node:path"
 
 import { Plugin } from "@opencode/plugin"
 
@@ -13,7 +13,11 @@ import {
   INTERNAL_AGENT_ID,
   VISION_SYSTEM_PROMPT,
 } from "./catalog.js"
-import { parseOptions, type PluginOptionsInput } from "./config.js"
+import {
+  DEFAULT_SAVE_DIR,
+  parseOptions,
+  type PluginOptionsInput,
+} from "./config.js"
 import { ModelCapabilities } from "./model-capabilities.js"
 import {
   OpenCodeVisionRunner,
@@ -25,12 +29,10 @@ import {
   type RequestContextMessage,
 } from "./request-registry.js"
 
-const PROJECT_ROOT = fileURLToPath(new URL("../", import.meta.url))
-
 export default Plugin.define({
   id: "moeblack.vision-bridge",
   setup: async (ctx) => {
-    const options = parseOptions(ctx.options as PluginOptionsInput, PROJECT_ROOT)
+    const options = parseOptions(ctx.options as PluginOptionsInput)
     const visionModel = await configureVisionCatalog(ctx, options)
     const location = ctx.location
     // Setup runs inside OpenCode's batched catalog boot. Read model data only
@@ -53,7 +55,8 @@ export default Plugin.define({
       const existing = bridges.get(directory)
       if (existing) return existing
       const bridge = new VisionBridge({
-        saveDir: options.saveDir,
+        saveDir: resolveSaveDir(directory, options.saveDir),
+        timeoutMs: options.timeoutMs,
         describe: (request) => runner.describe(request, directory),
       })
       bridges.set(directory, bridge)
@@ -61,7 +64,7 @@ export default Plugin.define({
     }
     const readImage = new ReadImageTool({
       projectDirectory: location.directory,
-      saveDir: options.saveDir,
+      saveDir: resolveSaveDir(location.directory, options.saveDir),
       describe: (request) => runner.describe(request),
     })
 
@@ -77,7 +80,7 @@ export default Plugin.define({
               type: "string",
               minLength: 1,
               description:
-                "Image file path. Supports absolute paths, ~/ paths, and paths relative to the project directory.",
+                "Image file path relative to the project directory, or an absolute path inside it.",
             },
             question: {
               type: "string",
@@ -136,8 +139,11 @@ export default Plugin.define({
       const messages = event.messages as unknown as BridgeMessage[]
       if (!hasAttachmentParts(messages)) return
       const session = await ctx.session.get({ sessionID: event.sessionID })
+      const modelInputCapabilities = await capabilities
+        .inputCapabilities(event.model)
+        .catch(() => new Set<string>())
       await bridgeFor(session.location.directory).transform({
-        modelInputCapabilities: await capabilities.inputCapabilities(event.model),
+        modelInputCapabilities,
         messages,
       })
     })
@@ -155,6 +161,10 @@ export default Plugin.define({
     })
   },
 })
+
+function resolveSaveDir(directory: string, configured?: string): string {
+  return path.resolve(directory, configured ?? DEFAULT_SAVE_DIR)
+}
 
 function inProcessVisionClient(ctx: Parameters<typeof Plugin.define>[0]["setup"] extends (
   context: infer Context,
@@ -176,10 +186,6 @@ function inProcessVisionClient(ctx: Parameters<typeof Plugin.define>[0]["setup"]
       interrupt: async (input) => {
         await ctx.session.interrupt(input)
       },
-      // The Promise plugin surface does not expose session removal. Keeping this
-      // empty transient session is preferable to re-entering the HTTP server
-      // from its own context hook, which interrupts the parent request in V2.
-      remove: async () => undefined,
     },
   }
 }

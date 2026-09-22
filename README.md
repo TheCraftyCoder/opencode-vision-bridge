@@ -12,7 +12,7 @@ GLM-5.3-Flash is the default. You can override it with any multimodal model alre
 
 - Images: the v2 `context` hook checks the active model. Text-only models receive a GLM-5.3-Flash description; models with native image input receive the original image unchanged.
 - PDFs: the v2 `prompt` hook intercepts the file before OpenCode's attachment resolver can omit it, asks GLM-5.3-Flash to describe it, removes the binary attachment, and appends the description to the admitted prompt.
-- Each bridged attachment is saved under a SHA-256 filename in `images/` and the injected text includes its local `file:` URL.
+- Each bridged attachment is saved under a SHA-256 filename in the project's `.opencode/vision-bridge/attachments/` directory. Local paths are not sent to either model.
 - Vision failures are represented by an explicit unavailable-analysis note. The plugin does not invent attachment contents or abort the main text-only request.
 - A complementary `read_image` tool lets the model inspect an image already on disk.
 
@@ -78,8 +78,8 @@ Object form is only needed when overriding defaults:
 | `vision.model` | `string` | `"zai-coding-plan/glm-5.3-flash"` | `provider/model[#variant]` for an OpenCode model; upstream model ID for a custom endpoint. |
 | `vision.baseURL` | `string` | none | Base URL for an OpenAI-compatible endpoint. |
 | `vision.apiKey` | `string` | none | Bearer key for an OpenAI-compatible endpoint. |
-| `saveDir` | `string` | `images/` in the plugin directory | Where bridged attachments are saved. |
-| `timeoutMs` | positive integer | `180000` | Timeout for one multimodal generation. |
+| `saveDir` | `string` | `.opencode/vision-bridge/attachments/` in the session project | Where bridged attachments are saved. Relative paths resolve from the session project. |
+| `timeoutMs` | positive integer | `180000` | Timeout for one multimodal generation and the complete rendering of one PDF. |
 
 To reuse another OpenCode model:
 
@@ -136,24 +136,24 @@ Immediately before a model call, the plugin reads the active model's current cat
 PDFs need an earlier path because current OpenCode v2 attachment resolution does not reliably place PDF prompt attachments into model context. The plugin handles them in `ctx.session.hook("prompt")`:
 
 1. Read a pasted `data:` URL or attached local `file:` URL.
-2. Save the PDF using its SHA-256 digest and render its pages to PNG in batches of eight.
+2. Validate the file size, save the PDF using its SHA-256 digest, and render at most 32 pages to bounded PNG batches of eight.
 3. Ask GLM-5.3-Flash to inspect the page images using the surrounding user text as the question.
-4. Remove the original PDF attachment and its prompt mention.
+4. Remove the original binary PDF attachment while preserving existing prompt text and mention offsets.
 5. Append a bounded `[Attached PDF] ... [/Attached PDF]` text description to the same user prompt.
 
 Other prompt files, including text files and pasted images, remain on OpenCode's normal resolution path.
 
 ### Internal generation
 
-The bridge registers a hidden, one-step internal agent with all tools denied. A transient `session.generate` call receives the attachment from an in-memory request registry, returns text directly, and admits no user or assistant message to the internal session. This prevents tool execution and automatic title generation during visual analysis.
+The bridge registers a hidden, one-step internal agent with all tools denied. One reusable internal session per project handles serialized `session.generate` calls. An idempotent in-memory request registry supplies the attachment without admitting user or assistant messages. This prevents tool execution, duplicate media injection, unbounded session creation, and automatic title generation during visual analysis.
 
 ## Explicit `read_image` tool
 
-`read_image` handles PNG, JPEG, GIF, WebP, BMP, and AVIF files already on disk. It accepts:
+`read_image` handles PNG, JPEG, GIF, WebP, BMP, and AVIF files already inside the current project. It rejects unknown extensions, oversized files, traversal, home-relative paths, and symlinks that escape the project. It accepts:
 
 | Parameter | Type | Required | Description |
 | --- | --- | --- | --- |
-| `filePath` | `string` | yes | Absolute path, `~/` path, or path relative to the project. |
+| `filePath` | `string` | yes | Path relative to the project, or an absolute path that remains inside it. |
 | `question` | `string` | no | A focused visual question. Omit it for a general description. |
 
 Example input:
@@ -184,7 +184,8 @@ Then verify in OpenCode:
 ## Constraints
 
 - The default `zai-coding-plan/glm-5.3-flash` model must be available and authenticated in the OpenCode catalog. Override `vision.model` if you use a different provider.
-- Provider and model size/count limits still apply. A client accepting an attachment does not guarantee the upstream model accepts it.
-- The automatic description cache is in memory. A plugin reload or service restart causes the attachment to be described again; saved files are not deleted automatically.
-- The OpenCode Promise plugin surface does not currently expose session removal. Internal generation admits no messages, but an empty internal session may remain visible until OpenCode cleans it up.
+- Provider and model size/count limits still apply. The bridge additionally caps attachments at 25 MiB, PDFs at 32 rendered pages, rendered page images at 4 MiB, and PDFs at four per prompt.
+- Successful descriptions are cached in memory for 15 minutes with a 128-entry limit. Failures and partial PDF descriptions are never cached.
+- One empty hidden internal session may remain visible per project because the OpenCode Promise plugin surface does not expose safe session removal from inside a hook.
+- Saved digest files are not deleted automatically.
 - OpenCode plugin APIs can change between releases. Keep the three `@opencode/*` package versions aligned and rerun `npm run check` after upgrading.

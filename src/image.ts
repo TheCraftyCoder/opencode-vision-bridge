@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto"
-import { mkdir, readFile, writeFile } from "node:fs/promises"
+import { mkdir, open, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 
@@ -28,7 +28,18 @@ const EXTENSION_MEDIA_TYPES: Readonly<Record<string, string>> = {
   ".pdf": "application/pdf",
 }
 
-const DEFAULT_FILE_MEDIA_TYPE = "image/png"
+/** Maximum size accepted for either an in-memory or disk attachment. */
+export const MAX_ATTACHMENT_BYTES = 25 * 1024 * 1024
+
+const SUPPORTED_MEDIA_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/bmp",
+  "image/avif",
+  "application/pdf",
+])
 
 export type AttachmentLikePart =
   | {
@@ -77,21 +88,26 @@ export async function attachmentFromUri(
   if (!uri.startsWith("file:")) return undefined
 
   const filePath = fileURLToPath(uri)
-  const mediaType =
-    (filename ? mediaTypeFromPath(filename) : undefined) ??
-    mediaTypeFromPath(filePath)
-  if (!mediaType || !isSupportedMediaType(mediaType)) return undefined
-  const bytes = await readFile(filePath)
-  return makeAttachment(bytes, mediaType, filename ?? path.basename(filePath))
+  if (!mediaTypeFromPath(filePath)) return undefined
+  const attachment = await attachmentFromFile(filePath)
+  return makeAttachment(
+    attachment.bytes,
+    attachment.mediaType,
+    filename ?? attachment.filename,
+  )
 }
 
 export async function attachmentFromFile(
   filePath: string,
 ): Promise<AttachmentAsset> {
-  const bytes = await readFile(filePath)
-  const mediaType =
-    EXTENSION_MEDIA_TYPES[path.extname(filePath).toLowerCase()] ??
-    DEFAULT_FILE_MEDIA_TYPE
+  const mediaType = mediaTypeFromPath(filePath)
+  if (!mediaType || !isSupportedMediaType(mediaType)) {
+    throw new TypeError(
+      `Unsupported attachment file extension: ${path.basename(filePath)}`,
+    )
+  }
+  const bytes = await readFileWithLimit(filePath)
+  validateFileSignature(bytes, mediaType, filePath)
   return makeAttachment(bytes, mediaType, path.basename(filePath))
 }
 
@@ -130,7 +146,7 @@ function attachmentFromMediaPart(
   const decoded =
     typeof part.data === "string"
       ? decodeStringData(part.data, declaredType)
-      : { bytes: Buffer.from(part.data), mediaType: declaredType }
+      : { bytes: bytesFromUint8Array(part.data), mediaType: declaredType }
 
   return makeAttachment(
     decoded.bytes,
@@ -199,11 +215,17 @@ function decodeDataUrl(
 }
 
 function decodeBase64(value: string): Buffer {
-  if (
-    value.length === 0 ||
-    value.length % 4 !== 0 ||
-    !BASE64_PATTERN.test(value)
-  ) {
+  if (value.length === 0 || value.length % 4 !== 0) {
+    throw new TypeError("Attachment contains invalid Base64 data")
+  }
+  const padding = value.endsWith("==") ? 2 : value.endsWith("=") ? 1 : 0
+  const decodedLength = (value.length / 4) * 3 - padding
+  if (decodedLength > MAX_ATTACHMENT_BYTES) {
+    throw new RangeError(
+      `Attachment exceeds the ${MAX_ATTACHMENT_BYTES}-byte size limit`,
+    )
+  }
+  if (!BASE64_PATTERN.test(value)) {
     throw new TypeError("Attachment contains invalid Base64 data")
   }
   const bytes = Buffer.from(value, "base64")
@@ -218,6 +240,12 @@ function makeAttachment(
   mediaType: string,
   filename: string | undefined,
 ): AttachmentAsset {
+  if (bytes.byteLength > MAX_ATTACHMENT_BYTES) {
+    throw new RangeError(
+      `Attachment exceeds the ${MAX_ATTACHMENT_BYTES}-byte size limit`,
+    )
+  }
+  validateFileSignature(bytes, mediaType, filename ?? "attachment")
   return {
     bytes,
     dataUrl: `data:${mediaType};base64,${bytes.toString("base64")}`,
@@ -232,7 +260,7 @@ function mediaTypeFromPath(filePath: string): string | undefined {
 
 export function isSupportedMediaType(mediaType: string): boolean {
   const normalized = normalizeMediaType(mediaType)
-  return normalized.startsWith("image/") || normalized === "application/pdf"
+  return SUPPORTED_MEDIA_TYPES.has(normalized)
 }
 
 export function isPdfMediaType(mediaType: string): boolean {
@@ -261,4 +289,79 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function isAlreadyExists(error: unknown): boolean {
   return isRecord(error) && error.code === "EEXIST"
+}
+
+function bytesFromUint8Array(value: Uint8Array): Buffer {
+  if (value.byteLength > MAX_ATTACHMENT_BYTES) {
+    throw new RangeError(
+      `Attachment exceeds the ${MAX_ATTACHMENT_BYTES}-byte size limit`,
+    )
+  }
+  return Buffer.from(value)
+}
+
+async function readFileWithLimit(filePath: string): Promise<Buffer> {
+  const handle = await open(filePath, "r")
+  try {
+    const initial = await handle.stat()
+    if (!initial.isFile()) {
+      throw new TypeError(`Attachment path is not a regular file: ${filePath}`)
+    }
+    if (initial.size > MAX_ATTACHMENT_BYTES) {
+      throw new RangeError(
+        `Attachment exceeds the ${MAX_ATTACHMENT_BYTES}-byte size limit`,
+      )
+    }
+
+    const bytes = Buffer.allocUnsafe(initial.size)
+    let offset = 0
+    while (offset < bytes.byteLength) {
+      const result = await handle.read(bytes, offset, bytes.byteLength - offset, offset)
+      if (result.bytesRead === 0) break
+      offset += result.bytesRead
+    }
+    const final = await handle.stat()
+    if (final.size > MAX_ATTACHMENT_BYTES) {
+      throw new RangeError(
+        `Attachment exceeds the ${MAX_ATTACHMENT_BYTES}-byte size limit`,
+      )
+    }
+    return offset === bytes.byteLength ? bytes : bytes.subarray(0, offset)
+  } finally {
+    await handle.close()
+  }
+}
+
+function validateFileSignature(
+  bytes: Uint8Array,
+  mediaType: string,
+  filePath: string,
+): void {
+  const matches =
+    (mediaType === "image/png" && startsWith(bytes, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ||
+    (mediaType === "image/jpeg" && startsWith(bytes, [0xff, 0xd8, 0xff])) ||
+    (mediaType === "image/gif" && (startsWithAscii(bytes, "GIF87a") || startsWithAscii(bytes, "GIF89a"))) ||
+    (mediaType === "image/webp" && startsWithAscii(bytes, "RIFF") && startsWithAscii(bytes.subarray(8), "WEBP")) ||
+    (mediaType === "image/bmp" && startsWithAscii(bytes, "BM")) ||
+    (mediaType === "image/avif" && isAvif(bytes)) ||
+    (mediaType === "application/pdf" && startsWithAscii(bytes, "%PDF-"))
+  if (!matches) {
+    throw new TypeError(`File contents do not match ${mediaType}: ${filePath}`)
+  }
+}
+
+function startsWith(bytes: Uint8Array, prefix: readonly number[]): boolean {
+  return prefix.every((value, index) => bytes[index] === value)
+}
+
+function startsWithAscii(bytes: Uint8Array, prefix: string): boolean {
+  return startsWith(bytes, [...prefix].map((character) => character.charCodeAt(0)))
+}
+
+function isAvif(bytes: Uint8Array): boolean {
+  if (bytes.length < 12) return false
+  const boxType = String.fromCharCode(...bytes.subarray(4, 8))
+  if (boxType !== "ftyp") return false
+  const brands = new TextDecoder().decode(bytes.subarray(8))
+  return brands.includes("avif") || brands.includes("avis")
 }

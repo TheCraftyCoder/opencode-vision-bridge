@@ -7,6 +7,10 @@
 - Generalized attachment decoding, SHA-256 storage, caching, request injection, prompts, and output labels for both images and PDFs.
 - Made context bridging capability-specific so a model can receive images natively while unsupported PDFs are still described as text.
 - Added coverage for PDF data URLs, prompt mutation, mixed model capabilities, and non-media prompt attachments.
+- Bounded PDF bytes, pages, canvas/image memory, render time, and per-prompt PDF count; configured bundled fonts, CMaps, and WASM assets.
+- Made decode, file, catalog, save, render, and provider failures fail soft per attachment without caching transient failures.
+- Restricted `read_image` to verified image files inside the project and removed model-visible local paths and raw provider errors.
+- Reused one serialized internal session per project and made request injection idempotent.
 
 ## 1.1.0 - 2026-09-21
 

@@ -9,7 +9,6 @@ test("registry injects the pending image into one-shot session context", () => {
     dataUrl: "data:image/png;base64,cG5n",
     mediaType: "image/png",
     filename: "screen.png",
-    fileUrl: "file:///tmp/screen.png",
     question: "Read it",
   })
   const messages = [
@@ -61,7 +60,6 @@ test("registry injects every rendered PDF page into the GLM Flash request", () =
       pageEnd: 2,
       pageCount: 2,
     },
-    fileUrl: "file:///tmp/report.pdf",
     question: "Summarize it",
   })
   const messages = [
@@ -81,4 +79,20 @@ test("registry injects every rendered PDF page into the GLM Flash request", () =
     data: "data:image/png;base64,cGFnZTI=",
     filename: "report-page-2.png",
   })
+})
+
+test("registry injects a request at most once per session", () => {
+  const registry = new VisionRequestRegistry()
+  registry.set("ses_once", {
+    dataUrl: "data:image/png;base64,cG5n",
+    mediaType: "image/png",
+    question: "Read it",
+  })
+  const messages = [
+    { role: "user", content: [{ type: "text", text: "Read it" }] },
+  ]
+
+  assert.equal(registry.inject("ses_once", messages), true)
+  assert.equal(registry.inject("ses_once", messages), false)
+  assert.equal(messages[0]?.content.length, 2)
 })
