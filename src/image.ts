@@ -344,7 +344,8 @@ function validateFileSignature(
     (mediaType === "image/webp" && startsWithAscii(bytes, "RIFF") && startsWithAscii(bytes.subarray(8), "WEBP")) ||
     (mediaType === "image/bmp" && startsWithAscii(bytes, "BM")) ||
     (mediaType === "image/avif" && isAvif(bytes)) ||
-    (mediaType === "application/pdf" && startsWithAscii(bytes, "%PDF-"))
+    (mediaType === "application/pdf" &&
+      includesAscii(bytes.subarray(0, 1024), "%PDF-"))
   if (!matches) {
     throw new TypeError(`File contents do not match ${mediaType}: ${filePath}`)
   }
@@ -356,6 +357,10 @@ function startsWith(bytes: Uint8Array, prefix: readonly number[]): boolean {
 
 function startsWithAscii(bytes: Uint8Array, prefix: string): boolean {
   return startsWith(bytes, [...prefix].map((character) => character.charCodeAt(0)))
+}
+
+function includesAscii(bytes: Uint8Array, value: string): boolean {
+  return new TextDecoder("latin1").decode(bytes).includes(value)
 }
 
 function isAvif(bytes: Uint8Array): boolean {

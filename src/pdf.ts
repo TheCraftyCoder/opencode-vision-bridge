@@ -1,7 +1,6 @@
 import type { Canvas, SKRSContext2D } from "@napi-rs/canvas"
 import { createRequire } from "node:module"
 import path from "node:path"
-import { pathToFileURL } from "node:url"
 
 import type { AttachmentAsset } from "./image.js"
 
@@ -74,14 +73,14 @@ export function getPdfJsResourceOptions(): PdfJsResourceOptions {
   const pdfjsRoot = path.dirname(
     path.dirname(createRequire(import.meta.url).resolve("pdfjs-dist")),
   )
-  const assetUrl = (directory: string): string =>
-    pathToFileURL(path.join(pdfjsRoot, directory) + path.sep).href
+  const assetPath = (directory: string): string =>
+    `${path.join(pdfjsRoot, directory).split(path.sep).join("/")}/`
 
   return {
-    cMapUrl: assetUrl("cmaps"),
+    cMapUrl: assetPath("cmaps"),
     cMapPacked: true,
-    standardFontDataUrl: assetUrl("standard_fonts"),
-    wasmUrl: assetUrl("wasm"),
+    standardFontDataUrl: assetPath("standard_fonts"),
+    wasmUrl: assetPath("wasm"),
     useWorkerFetch: false,
     maxImageSize: PDF_MAX_IMAGE_PIXELS,
     canvasMaxAreaInBytes: PDF_CANVAS_MAX_AREA_BYTES,

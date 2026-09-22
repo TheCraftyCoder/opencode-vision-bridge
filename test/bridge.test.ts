@@ -512,3 +512,39 @@ test("a later PDF batch failure preserves earlier pages and is retried", async (
   assert.match(first.text, /PDF pages 9-9 of 9.*analysis was unavailable/s)
   assert.equal(calls, 4)
 })
+
+test("context bridging caps the number of analyzed attachments", async () => {
+  let calls = 0
+  const bridge = new VisionBridge({
+    saveDir: await mkdtemp(path.join(tmpdir(), "vision-bridge-count-cap-")),
+    describe: async () => {
+      calls += 1
+      return "described"
+    },
+  })
+  const input: BridgeMessage[] = [
+    {
+      role: "user",
+      content: Array.from({ length: 9 }, () => ({
+        type: "media" as const,
+        mediaType: "image/png",
+        data: PNG_DATA_URL,
+      })),
+    },
+  ]
+
+  await bridge.transform({
+    modelInputCapabilities: new Set(["text"]),
+    messages: input,
+  })
+
+  assert.equal(calls, 1, "duplicates should share one cached description")
+  const ninth = input[0]?.content[8]
+  assert.equal(ninth?.type, "text")
+  const ninthText =
+    ninth?.type === "text" && typeof ninth.text === "string" ? ninth.text : ""
+  assert.match(
+    ninthText,
+    /at most 8 bridged attachments/,
+  )
+})

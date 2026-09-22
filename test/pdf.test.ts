@@ -1,4 +1,6 @@
 import assert from "node:assert/strict"
+import { access } from "node:fs/promises"
+import path from "node:path"
 import test from "node:test"
 
 import { createCanvas, loadImage, PDFDocument } from "@napi-rs/canvas"
@@ -127,11 +129,17 @@ test("PDF renderer honors an already-aborted signal", async () => {
   )
 })
 
-test("PDF renderer resolves bundled pdf.js resource assets", () => {
+test("PDF renderer resolves readable bundled pdf.js resource paths", async () => {
   const options = getPdfJsResourceOptions()
   assert.match(options.cMapUrl, /pdfjs-dist[\\/]cmaps[\\/]$/)
   assert.match(options.standardFontDataUrl, /pdfjs-dist[\\/]standard_fonts[\\/]$/)
   assert.match(options.wasmUrl, /pdfjs-dist[\\/]wasm[\\/]$/)
+  assert.doesNotMatch(options.cMapUrl, /^file:/)
+  await Promise.all([
+    access(path.join(options.cMapUrl, "78-H.bcmap")),
+    access(path.join(options.standardFontDataUrl, "FoxitFixed.pfb")),
+    access(path.join(options.wasmUrl, "jbig2.wasm")),
+  ])
   assert.equal(options.useWorkerFetch, false)
   assert.equal(options.stopAtErrors, true)
 })

@@ -23,7 +23,7 @@ export async function configureVisionCatalog(
 ): Promise<Model.Ref> {
   const model: Model.Ref =
     options.vision.type === "opencode"
-      ? await requireVisionModel(ctx, Model.Ref.parse(options.vision.model))
+      ? Model.Ref.parse(options.vision.model)
       : await addCustomModel(ctx, options.vision)
 
   await ctx.agent.transform((agents) => {
@@ -76,26 +76,4 @@ async function addCustomModel(
   })
 
   return { providerID, id: modelID }
-}
-
-async function requireVisionModel(
-  ctx: Plugin.Context,
-  model: Model.Ref,
-): Promise<Model.Ref> {
-  const catalog = await ctx.model.list()
-  const info = catalog.data.find(
-    (candidate) =>
-      candidate.providerID === model.providerID && candidate.id === model.id,
-  )
-  if (!info) {
-    throw new Error(
-      `Vision bridge model is unavailable: ${model.providerID}/${model.id}`,
-    )
-  }
-  if (!info.capabilities.input.includes("image")) {
-    throw new Error(
-      `Vision bridge model does not accept image input: ${model.providerID}/${model.id}`,
-    )
-  }
-  return model
 }

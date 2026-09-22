@@ -17,6 +17,7 @@ export const DEFAULT_QUESTION =
 const CACHE_TTL_MS = 15 * 60 * 1_000
 const MAX_CACHE_ENTRIES = 128
 const MAX_PDFS_PER_PROMPT = 4
+const MAX_ATTACHMENTS_PER_CONTEXT = 8
 const UNAVAILABLE_DESCRIPTION =
   "Attachment analysis was unavailable. Do not infer content from this attachment; ask the user to retry."
 
@@ -170,6 +171,7 @@ export class VisionBridge {
     readonly messages: BridgeMessage[]
   }): Promise<void> {
     const occurrences: Occurrence[] = []
+    let analyzed = 0
     for (const message of input.messages) {
       const question = questionFromMessage(message)
       for (const [partIndex, part] of message.content.entries()) {
@@ -181,6 +183,20 @@ export class VisionBridge {
         ) {
           continue
         }
+        if (analyzed >= MAX_ATTACHMENTS_PER_CONTEXT) {
+          message.content[partIndex] = {
+            type: "text",
+            text: attachmentDescriptionText(
+              unavailableAttachment(
+                mediaType ?? "application/octet-stream",
+                filenameFromPart(part),
+                `Attachment was not analyzed because a model request may contain at most ${MAX_ATTACHMENTS_PER_CONTEXT} bridged attachments.`,
+              ),
+            ),
+          }
+          continue
+        }
+        analyzed += 1
         try {
           const attachment = attachmentFromPart(part)
           if (!attachment) continue

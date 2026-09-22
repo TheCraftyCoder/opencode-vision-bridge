@@ -68,6 +68,18 @@ test("attachmentFromPart reads PDF media parts", () => {
   assert.deepEqual(attachment.bytes, bytes)
 })
 
+test("attachmentFromPart accepts a valid PDF header after a short preamble", () => {
+  const bytes = Buffer.from("preamble\n%PDF-1.7")
+  const attachment = attachmentFromPart({
+    type: "media",
+    mediaType: "application/pdf",
+    data: bytes,
+  })
+
+  assert.ok(attachment)
+  assert.deepEqual(attachment.bytes, bytes)
+})
+
 test("attachmentFromUri reads pasted PDF data URLs", async () => {
   const bytes = Buffer.from("%PDF-1.7")
   const attachment = await attachmentFromUri(
