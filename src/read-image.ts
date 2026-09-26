@@ -1,4 +1,4 @@
-import { homedir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import { realpath } from "node:fs/promises"
 import path from "node:path"
 
@@ -77,10 +77,10 @@ export function resolveImagePath(
 }
 
 /**
- * Resolve a read_image path under the project root and reject symlink escapes.
- * Home-relative paths and absolute paths outside the project are deliberately
- * rejected by default: the tool is intended to inspect project assets, not
- * arbitrary files from the host. Absolute paths inside the project are fine.
+ * Resolve a read_image path under the project root or the OpenCode temp folder
+ * and reject symlink escapes. Home-relative paths and arbitrary host files are
+ * deliberately rejected: the tool is intended to inspect project assets and
+ * pasted session attachments.
  */
 async function resolveImagePathSecure(
   filePath: string,
@@ -93,15 +93,20 @@ async function resolveImagePathSecure(
 
   const projectPath = path.resolve(projectDirectory)
   const candidate = resolveImagePath(filePath, projectPath, homeDirectory)
-  if (!isWithin(projectPath, candidate)) {
+  const tempOpenCodePath = path.resolve(tmpdir(), "opencode")
+  const isProjectFile = isWithin(projectPath, candidate)
+  const isTempOpenCodeFile = isWithin(tempOpenCodePath, candidate)
+
+  if (!isProjectFile && !isTempOpenCodeFile) {
     throw new TypeError("read_image only accepts paths inside the project directory")
   }
 
-  const [projectRealPath, candidateRealPath] = await Promise.all([
-    realpath(projectPath),
+  const allowedRoot = isProjectFile ? projectPath : tempOpenCodePath
+  const [allowedRealPath, candidateRealPath] = await Promise.all([
+    realpath(allowedRoot).catch(() => allowedRoot),
     realpath(candidate),
   ])
-  if (!isWithin(projectRealPath, candidateRealPath)) {
+  if (!isWithin(allowedRealPath, candidateRealPath)) {
     throw new TypeError("read_image rejected a path that escapes the project directory")
   }
   return candidateRealPath

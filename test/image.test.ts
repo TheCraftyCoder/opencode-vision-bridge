@@ -32,6 +32,47 @@ test("imageFromPart reads the V2 media-part data URL shape", () => {
   assert.deepEqual(image.bytes, PNG_BYTES)
 })
 
+test("imageFromPart reads the OpenCode 2.0.18 nested media shape", () => {
+  const image = imageFromPart({
+    type: "media",
+    media: {
+      mediaType: "image/png",
+      source: {
+        type: "base64",
+        data: PNG_BYTES.toString("base64"),
+        mediaType: "image/png",
+      },
+    },
+    filename: "nested.png",
+  })
+
+  assert.ok(image)
+  assert.equal(image.mediaType, "image/png")
+  assert.equal(image.filename, "nested.png")
+  assert.deepEqual(image.bytes, PNG_BYTES)
+})
+
+test("imageFromPart reads nested media with inline() helper", () => {
+  const image = imageFromPart({
+    type: "media",
+    media: {
+      mediaType: "image/png",
+      inline: () => ({
+        mime: "image/png",
+        base64: PNG_BYTES.toString("base64"),
+        dataUrl: PNG_DATA_URL,
+      }),
+    },
+    filename: "inlined.png",
+  })
+
+  assert.ok(image)
+  assert.equal(image.mediaType, "image/png")
+  assert.equal(image.filename, "inlined.png")
+  assert.deepEqual(image.bytes, PNG_BYTES)
+})
+
+
 test("imageFromPart also reads the data-URL file-part shape", () => {
   const part: ImageLikePart = {
     type: "file",

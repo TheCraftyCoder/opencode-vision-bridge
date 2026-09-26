@@ -19,11 +19,19 @@ test("registry injects the pending image into one-shot session context", () => {
   ]
 
   assert.equal(registry.inject("ses_test", messages), true)
-  assert.deepEqual(messages[0]?.content[1], {
-    type: "media",
+  const injected = messages[0]?.content[1] as Record<string, unknown>
+  assert.equal(injected?.type, "media")
+  assert.equal(injected?.mediaType, "image/png")
+  assert.equal(injected?.data, "data:image/png;base64,cG5n")
+  assert.equal(injected?.filename, "screen.png")
+  assert.ok(injected?.media && typeof injected.media === "object")
+  const media = injected.media as Record<string, unknown>
+  assert.equal(media.mediaType, "image/png")
+  assert.equal(media.kind, "image")
+  assert.deepEqual(media.source, {
+    type: "base64",
+    data: "cG5n",
     mediaType: "image/png",
-    data: "data:image/png;base64,cG5n",
-    filename: "screen.png",
   })
 })
 
@@ -67,18 +75,21 @@ test("registry injects every rendered PDF page into the GLM Flash request", () =
   ]
 
   assert.equal(registry.inject("ses_pdf", messages), true)
-  assert.deepEqual(messages[0]?.content[1], {
-    type: "media",
-    mediaType: "image/png",
-    data: "data:image/png;base64,cGFnZTE=",
-    filename: "report-page-1.png",
-  })
-  assert.deepEqual(messages[0]?.content[2], {
-    type: "media",
-    mediaType: "image/png",
-    data: "data:image/png;base64,cGFnZTI=",
-    filename: "report-page-2.png",
-  })
+  const injected1 = messages[0]?.content[1] as Record<string, unknown>
+  assert.equal(injected1?.type, "media")
+  assert.equal(injected1?.mediaType, "image/png")
+  assert.equal(injected1?.data, "data:image/png;base64,cGFnZTE=")
+  assert.equal(injected1?.filename, "report-page-1.png")
+  const media1 = injected1?.media as Record<string, unknown>
+  assert.equal(media1?.mediaType, "image/png")
+
+  const injected2 = messages[0]?.content[2] as Record<string, unknown>
+  assert.equal(injected2?.type, "media")
+  assert.equal(injected2?.mediaType, "image/png")
+  assert.equal(injected2?.data, "data:image/png;base64,cGFnZTI=")
+  assert.equal(injected2?.filename, "report-page-2.png")
+  const media2 = injected2?.media as Record<string, unknown>
+  assert.equal(media2?.mediaType, "image/png")
 })
 
 test("registry injects a request at most once per session", () => {

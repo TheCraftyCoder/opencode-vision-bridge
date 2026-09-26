@@ -74,6 +74,21 @@ test("read_image reads an absolute image path, saves it, and returns the descrip
   )
 })
 
+test("read_image allows images inside OpenCode temp directory", async () => {
+  const input = await fixture()
+  const tempDir = path.join(tmpdir(), "opencode")
+  await mkdir(tempDir, { recursive: true })
+  const pastedPath = path.join(tempDir, "pasted-test.png")
+  await writeFile(pastedPath, PNG_BYTES)
+
+  const result = await input.tool.execute({ filePath: pastedPath })
+
+  assert.equal(input.requests.length, 1)
+  assert.equal(input.requests[0]?.filename, "pasted-test.png")
+  assert.match(result, /terminal window shows a compiler error/)
+})
+
+
 test("read_image resolves relative paths against the catalog project directory", async () => {
   const input = await fixture()
   const imageDirectory = path.join(input.projectDirectory, "assets")

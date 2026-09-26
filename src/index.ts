@@ -26,12 +26,17 @@ import {
 import { ReadImageTool, type ReadImageInput } from "./read-image.js"
 import {
   VisionRequestRegistry,
+  ensureMediaFactory,
+  setHostMediaPrototype,
   type RequestContextMessage,
 } from "./request-registry.js"
+
+const globalRequests = new VisionRequestRegistry()
 
 export default Plugin.define({
   id: "moeblack.vision-bridge",
   setup: async (ctx) => {
+    await ensureMediaFactory().catch(() => {})
     const options = parseOptions(ctx.options as PluginOptionsInput)
     const visionModel = await configureVisionCatalog(ctx, options)
     const location = ctx.location
@@ -41,7 +46,7 @@ export default Plugin.define({
       const current = await ctx.model.list()
       return current.data
     })
-    const requests = new VisionRequestRegistry()
+    const requests = globalRequests
     const runner = new OpenCodeVisionRunner({
       client: inProcessVisionClient(ctx),
       requests,
@@ -134,6 +139,20 @@ export default Plugin.define({
     }
 
     await ctx.session.hook("context", async (event) => {
+      // Capture the host Me (Media.Asset) prototype from any real media part
+      // that passes through so we can stamp injected parts with the same class.
+      try {
+        for (const msg of (event.messages as any[]) ?? []) {
+          for (const part of msg?.content ?? []) {
+            if (part?.type === "media" && part.media) {
+              setHostMediaPrototype(
+                Object.getPrototypeOf(part.media),
+                part.media.constructor,
+              )
+            }
+          }
+        }
+      } catch {}
       if (prepareInternalVisionRequest(event)) return
 
       const messages = event.messages as unknown as BridgeMessage[]

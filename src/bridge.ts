@@ -4,6 +4,7 @@ import {
   attachmentFromPart,
   attachmentFromUri,
   isPdfMediaType,
+  isRecord,
   isSupportedMediaType,
   saveAttachment,
   type AttachmentAsset,
@@ -59,10 +60,12 @@ export interface VisionDescriptionRequest {
   readonly dataUrl: string
   readonly mediaType: string
   readonly filename?: string
+  readonly hostMedia?: unknown
   readonly additionalMedia?: ReadonlyArray<{
     readonly dataUrl: string
     readonly mediaType: string
     readonly filename?: string
+    readonly hostMedia?: unknown
   }>
   readonly source?: {
     readonly mediaType: string
@@ -286,6 +289,7 @@ export class VisionBridge {
         await this.#describe({
           dataUrl: attachment.dataUrl,
           mediaType: attachment.mediaType,
+          hostMedia: attachment.hostMedia,
           ...(attachment.filename === undefined
             ? {}
             : { filename: sanitizeFilename(attachment.filename) }),
@@ -418,8 +422,21 @@ function isAttachmentCandidate(part: BridgePart): boolean {
 }
 
 function mediaTypeFromPart(part: BridgePart): string | undefined {
-  if (part.type === "media" && typeof part.mediaType === "string") {
-    return part.mediaType.toLowerCase()
+  if (part.type === "media") {
+    if (typeof part.mediaType === "string") {
+      return part.mediaType.toLowerCase()
+    }
+    if (isRecord(part.media)) {
+      if (typeof part.media.mediaType === "string") {
+        return part.media.mediaType.toLowerCase()
+      }
+      if (
+        isRecord(part.media.source) &&
+        typeof part.media.source.mediaType === "string"
+      ) {
+        return part.media.source.mediaType.toLowerCase()
+      }
+    }
   }
   if (part.type !== "file") return undefined
   if (typeof part.mime === "string") return part.mime.toLowerCase()

@@ -44,8 +44,9 @@ const SUPPORTED_MEDIA_TYPES = new Set([
 export type AttachmentLikePart =
   | {
       readonly type: "media"
-      readonly mediaType: string
-      readonly data: string | Uint8Array
+      readonly mediaType?: string
+      readonly data?: string | Uint8Array
+      readonly media?: unknown
       readonly filename?: string
     }
   | {
@@ -55,11 +56,13 @@ export type AttachmentLikePart =
       readonly filename?: string
     }
 
+
 export interface AttachmentAsset {
   readonly bytes: Buffer
   readonly dataUrl: string
   readonly mediaType: string
   readonly filename?: string
+  readonly hostMedia?: unknown
 }
 
 export interface SavedAttachment {
@@ -136,24 +139,92 @@ export async function saveAttachment(
 function attachmentFromMediaPart(
   part: Record<string, unknown>,
 ): AttachmentAsset | undefined {
-  if (typeof part.mediaType !== "string") return undefined
-  const declaredType = normalizeMediaType(part.mediaType)
+  const rawMediaType = extractMediaTypeFromMediaPart(part)
+  if (typeof rawMediaType !== "string") return undefined
+  const declaredType = normalizeMediaType(rawMediaType)
   if (!isSupportedMediaType(declaredType)) return undefined
-  if (typeof part.data !== "string" && !(part.data instanceof Uint8Array)) {
+
+  const data = extractDataFromMediaPart(part)
+  if (typeof data !== "string" && !(data instanceof Uint8Array)) {
     return undefined
   }
 
   const decoded =
-    typeof part.data === "string"
-      ? decodeStringData(part.data, declaredType)
-      : { bytes: bytesFromUint8Array(part.data), mediaType: declaredType }
+    typeof data === "string"
+      ? decodeStringData(data, declaredType)
+      : { bytes: bytesFromUint8Array(data), mediaType: declaredType }
 
   return makeAttachment(
     decoded.bytes,
     decoded.mediaType,
     optionalFilename(part.filename),
+    part.media,
   )
 }
+
+function extractMediaTypeFromMediaPart(
+  part: Record<string, unknown>,
+): string | undefined {
+  if (typeof part.mediaType === "string") return part.mediaType
+  if (isRecord(part.media)) {
+    if (typeof part.media.mediaType === "string") return part.media.mediaType
+    if (
+      isRecord(part.media.source) &&
+      typeof part.media.source.mediaType === "string"
+    ) {
+      return part.media.source.mediaType
+    }
+  }
+  return undefined
+}
+
+function extractDataFromMediaPart(
+  part: Record<string, unknown>,
+): string | Uint8Array | undefined {
+  if (typeof part.data === "string" || part.data instanceof Uint8Array) {
+    return part.data
+  }
+  if (isRecord(part.media)) {
+    if (typeof part.media.inline === "function") {
+      try {
+        const inline = (part.media.inline as () => unknown)()
+        if (isRecord(inline)) {
+          if (typeof inline.dataUrl === "string") return inline.dataUrl
+          if (typeof inline.base64 === "string") return inline.base64
+        }
+      } catch {
+        // ignore inline() failure
+      }
+    }
+    if (isRecord(part.media.source)) {
+      const source = part.media.source
+      if (source.type === "base64" && typeof source.data === "string") {
+        return source.data
+      }
+      if (
+        source.type === "bytes" &&
+        (typeof source.data === "string" || source.data instanceof Uint8Array)
+      ) {
+        return source.data
+      }
+      if (
+        source.type === "url" &&
+        typeof source.url === "string" &&
+        source.url.startsWith("data:")
+      ) {
+        return source.url
+      }
+    }
+    if (typeof part.media.data === "string" || part.media.data instanceof Uint8Array) {
+      return part.media.data
+    }
+    if (typeof part.media.dataUrl === "string") {
+      return part.media.dataUrl
+    }
+  }
+  return undefined
+}
+
 
 function attachmentFromFilePart(
   part: Record<string, unknown>,
@@ -182,6 +253,7 @@ function attachmentFromFilePart(
     decoded.bytes,
     decoded.mediaType,
     optionalFilename(part.filename),
+    part.media,
   )
 }
 
@@ -239,6 +311,7 @@ function makeAttachment(
   bytes: Buffer,
   mediaType: string,
   filename: string | undefined,
+  hostMedia?: unknown,
 ): AttachmentAsset {
   if (bytes.byteLength > MAX_ATTACHMENT_BYTES) {
     throw new RangeError(
@@ -251,6 +324,7 @@ function makeAttachment(
     dataUrl: `data:${mediaType};base64,${bytes.toString("base64")}`,
     mediaType,
     ...(filename === undefined ? {} : { filename }),
+    ...(hostMedia === undefined ? {} : { hostMedia }),
   }
 }
 
@@ -283,9 +357,10 @@ function normalizeMediaType(value: string): string {
   return value.split(";", 1)[0]!.trim().toLowerCase()
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null
 }
+
 
 function isAlreadyExists(error: unknown): boolean {
   return isRecord(error) && error.code === "EEXIST"
